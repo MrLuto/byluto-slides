@@ -415,6 +415,8 @@ export const useCurrentSlideId = () => useDeckStore((s) => s.currentSlideId);
 export const useZoom = () => useDeckStore((s) => s.zoom);
 export const useEditorMode = () => useDeckStore((s) => s.editorMode);
 export const useEditingTextId = () => useDeckStore((s) => s.editingTextId);
+export const useCanUndo = () => useDeckStore((s) => s.past.length > 0);
+export const useCanRedo = () => useDeckStore((s) => s.future.length > 0);
 
 /** Selected element ids as a stable array reference (shallow-compared). */
 export const useSelectedElementIds = () =>
