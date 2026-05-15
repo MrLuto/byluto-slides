@@ -19,6 +19,7 @@ const App = () => (
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/audience" element={<AudienceWindow />} />
+          <Route path="/dev/mock-deck" element={<DevMockDeck />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
