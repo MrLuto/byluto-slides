@@ -17,6 +17,7 @@ import {
   Copy,
   Download,
   Image as ImageIcon,
+  Keyboard,
   Redo2,
   Square,
   Circle as CircleIcon,
@@ -25,6 +26,7 @@ import {
   Undo2,
   Upload,
 } from 'lucide-react';
+import { ShortcutsDialog } from '@/editor/rendering/ShortcutsDialog';
 import {
   createImageElement,
   createShapeElement,
