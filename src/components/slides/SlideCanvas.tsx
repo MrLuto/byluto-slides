@@ -9,10 +9,10 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { SLIDE_WIDTH, SLIDE_HEIGHT, useSlideScale, SlideScaleContext } from './ScaledSlide';
+import { SlideStage, useSlideScale } from '@/slides/runtime/SlideStage';
 
 // Re-export for backwards compatibility
-export { useSlideScale } from './ScaledSlide';
+export { useSlideScale };
 
 interface SlideCanvasProps {
   children: React.ReactNode;
