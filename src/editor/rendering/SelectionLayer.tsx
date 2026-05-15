@@ -1,5 +1,5 @@
 /**
- * SelectionLayer — selection + drag-to-move overlay (Phase 3C).
+ * SelectionLayer — selection + drag-to-move + resize overlay (Phase 3C–3E).
  *
  * Lives inside the same 1920×1080 coordinate space as `DataSlideRenderer`,
  * as a separate sibling layer. Responsibilities:
@@ -7,26 +7,28 @@
  *   - capture clicks on empty slide space      → `clearSelection`
  *   - draw a selection outline on selected elements
  *   - drag to move all currently-selected elements together
+ *   - resize a single selected element via 4 corner handles
+ *   - keyboard nudging (1 / 10 units) for the current selection
  *
- * It does NOT mutate elements other than translating x/y (no resize, no
- * text edit). `ElementRenderer` uses `pointer-events: none`, so we mirror
- * each element's bounding box here as a transparent hit target with
- * `pointer-events: auto`. Lines are skipped for now — they'll get
- * hit-testing/move support in a later phase.
+ * It only mutates element x/y (move + resize) and width/height (resize).
+ * No rotation, no text edit. `ElementRenderer` uses `pointer-events: none`,
+ * so we mirror each element's bounding box here as a transparent hit
+ * target with `pointer-events: auto`. Lines are skipped — they'll get
+ * hit-testing/move/resize support in a later phase.
  *
  * Coordinate conversion:
  *   The slide is rendered through `SlideStage`, which applies a CSS scale
  *   to fit a 1920×1080 surface inside the visible canvas. We read that
  *   scale via `useSlideScale()` and divide pointer deltas (screen pixels)
- *   by it to get canvas-space deltas. Example: at scale 0.5 the user moves
- *   100 screen px → 200 slide-coordinate px.
+ *   by it to get canvas-space deltas. Example: at scale 0.5, 100 screen
+ *   px → 200 slide-coord px.
  *
  * State updates:
  *   We do NOT call `updateElement` on every `mousemove`. Instead we cache
  *   the latest pointer event in a ref and flush a single batched update
- *   per animation frame via `requestAnimationFrame`. The drag start
- *   snapshot of element positions is held in a ref so we never read stale
- *   x/y from the store mid-drag.
+ *   per animation frame via `requestAnimationFrame`. Drag-start / resize-
+ *   start snapshots are held in refs so we never read stale values from
+ *   the store mid-gesture.
  */
 import React, { useEffect, useRef } from 'react';
 import type { ID, Slide, SlideElement } from '@/editor/model/types';
