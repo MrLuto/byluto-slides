@@ -1,25 +1,19 @@
 /**
- * InspectorPanel — right-side editor panel (Phase 3F).
+ * InspectorPanel — Phase 4B chrome refresh.
  *
- * Visible only inside the dev mock-deck route. Reads the single currently-
- * selected element directly from the deck store and pipes edits back via
- * `updateElement`. Pure UI: no rendering of slide content, no awareness of
- * `SlideStage` or `DataSlideRenderer`, so render-only components remain
- * untouched.
+ * Pure UI polish, no behavior change. Same store wiring:
+ *   - reads single selected element from currentSlide
+ *   - patches via updateElement (geometry, text, shape style)
+ *   - clamps width/height to MIN_SIZE, opacity to [0,1]
  *
- * Field → data-model mapping:
- *   - x / y / width / height / rotation → patched at the top level of the
- *     element. Width/height are clamped to >= 20 (matches MIN_SIZE used by
- *     the resize gesture). Opacity is clamped to [0, 1].
- *   - text                              → TextElement.text
- *   - font size / color                 → TextElement.textStyle.{fontSize,color}
- *   - fill / stroke / stroke width      → ShapeElement.style.{fill,stroke,strokeWidth}
- *
- * Nested objects (`textStyle`, `style`) are merged immutably so untouched
- * fields are preserved. Empty/invalid numeric input is ignored rather than
- * writing NaN.
+ * Visual changes only:
+ *   - Sectioned cards with collapsible look
+ *   - Better empty/multi-select states (icon + helper text)
+ *   - Tighter, more consistent inputs
+ *   - Type pill in header
  */
 import React from 'react';
+import { MousePointerSquareDashed, Layers, Image as ImageIcon, Square as SquareIcon, Type as TypeIcon } from 'lucide-react';
 import {
   useCurrentSlide,
   useDeckActions,
@@ -40,31 +34,42 @@ export function InspectorPanel() {
   const selectedIds = useSelectedElementIds();
   const { updateElement } = useDeckActions();
 
-  // Empty / multi-select states.
-  if (!slide) return <ShellEmpty msg="No slide" />;
-  if (selectedIds.length === 0) return <ShellEmpty msg="Nothing selected" />;
+  if (!slide)
+    return <ShellEmpty title="No slide" hint="Select a slide to begin." />;
+  if (selectedIds.length === 0)
+    return (
+      <ShellEmpty
+        title="Nothing selected"
+        hint="Click an element on the canvas to inspect its properties."
+      />
+    );
   if (selectedIds.length > 1)
-    return <ShellEmpty msg={`${selectedIds.length} elements selected`} />;
+    return (
+      <ShellEmpty
+        title={`${selectedIds.length} selected`}
+        hint="Multi-element editing is not available yet."
+      />
+    );
 
   const el = slide.elements.find((e) => e.id === selectedIds[0]);
-  if (!el) return <ShellEmpty msg="Element not found" />;
+  if (!el) return <ShellEmpty title="Element not found" hint="" />;
 
   const patch = (p: Partial<SlideElement>) =>
     updateElement(slide.id, el.id, p);
 
   return (
     <aside className="w-72 shrink-0 h-full overflow-y-auto border-l border-border bg-background">
-      <div className="px-4 py-3 border-b border-border">
-        <div className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">
-          Inspector
-        </div>
-        <div className="text-sm font-medium truncate">{el.type}</div>
-        <div className="text-xs font-mono text-muted-foreground truncate">
-          {el.id}
+      <div className="px-4 py-3 border-b border-border flex items-center gap-3">
+        <TypeBadge type={el.type} />
+        <div className="min-w-0">
+          <div className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">
+            Inspector
+          </div>
+          <div className="text-sm font-medium capitalize truncate">{el.type}</div>
         </div>
       </div>
 
-      <Section title="Geometry">
+      <Section title="Position & size">
         <Row>
           <NumField label="X" value={el.x} onChange={(v) => patch({ x: v })} />
           <NumField label="Y" value={el.y} onChange={(v) => patch({ y: v })} />
@@ -95,9 +100,7 @@ export function InspectorPanel() {
             step={0.05}
             min={0}
             max={1}
-            onChange={(v) =>
-              patch({ opacity: Math.max(0, Math.min(1, v)) })
-            }
+            onChange={(v) => patch({ opacity: Math.max(0, Math.min(1, v)) })}
           />
         </Row>
       </Section>
@@ -108,9 +111,15 @@ export function InspectorPanel() {
   );
 }
 
-// ──────────────────────────────────────────────────────────────────────────
-// Type-specific sections
-// ──────────────────────────────────────────────────────────────────────────
+function TypeBadge({ type }: { type: SlideElement['type'] }) {
+  const Icon =
+    type === 'text' ? TypeIcon : type === 'image' ? ImageIcon : type === 'shape' ? SquareIcon : Layers;
+  return (
+    <div className="h-9 w-9 rounded-md bg-primary/10 text-primary inline-flex items-center justify-center shrink-0">
+      <Icon className="h-4 w-4" />
+    </div>
+  );
+}
 
 function TextSection({
   element,
@@ -125,12 +134,10 @@ function TextSection({
 
   return (
     <Section title="Text">
-      <label className="block px-3 pb-2 text-[10px] uppercase tracking-wider text-muted-foreground">
-        Content
-      </label>
-      <div className="px-3 pb-3">
+      <div className="px-3 pt-1 pb-2">
+        <Label>Content</Label>
         <textarea
-          className="w-full h-20 text-sm border border-border rounded px-2 py-1 bg-background"
+          className="w-full h-20 text-sm border border-border rounded-md px-2 py-1.5 bg-background focus:outline-none focus:ring-1 focus:ring-primary/50"
           value={element.text}
           onChange={(e) =>
             patch({ text: e.target.value } as Partial<TextElement>)
@@ -191,22 +198,34 @@ function ShapeSection({
   );
 }
 
-// ──────────────────────────────────────────────────────────────────────────
-// Primitives
-// ──────────────────────────────────────────────────────────────────────────
+// ── primitives ─────────────────────────────────────────────────────────
 
-function ShellEmpty({ msg }: { msg: string }) {
+function ShellEmpty({ title, hint }: { title: string; hint: string }) {
   return (
-    <aside className="w-72 shrink-0 h-full border-l border-border bg-background flex items-center justify-center text-xs text-muted-foreground">
-      {msg}
+    <aside className="w-72 shrink-0 h-full border-l border-border bg-background flex flex-col items-center justify-center px-6 text-center">
+      <div className="h-10 w-10 rounded-full bg-muted text-muted-foreground inline-flex items-center justify-center mb-3">
+        <MousePointerSquareDashed className="h-5 w-5" />
+      </div>
+      <div className="text-sm font-medium">{title}</div>
+      {hint && (
+        <div className="text-xs text-muted-foreground mt-1 leading-snug">
+          {hint}
+        </div>
+      )}
     </aside>
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
   return (
     <div className="border-b border-border py-2">
-      <div className="px-3 py-1 text-[10px] font-mono uppercase tracking-wider text-muted-foreground">
+      <div className="px-3 py-1.5 text-[10px] font-mono uppercase tracking-wider text-muted-foreground">
         {title}
       </div>
       {children}
@@ -216,6 +235,14 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 function Row({ children }: { children: React.ReactNode }) {
   return <div className="flex gap-2 px-3 py-1">{children}</div>;
+}
+
+function Label({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="block text-[10px] uppercase tracking-wider text-muted-foreground mb-1">
+      {children}
+    </span>
+  );
 }
 
 interface NumFieldProps {
@@ -230,9 +257,7 @@ interface NumFieldProps {
 function NumField({ label, value, min, max, step = 1, onChange }: NumFieldProps) {
   return (
     <label className="flex-1 min-w-0 block">
-      <span className="block text-[10px] uppercase tracking-wider text-muted-foreground mb-1">
-        {label}
-      </span>
+      <Label>{label}</Label>
       <input
         type="number"
         value={Number.isFinite(value) ? value : ''}
@@ -241,12 +266,12 @@ function NumField({ label, value, min, max, step = 1, onChange }: NumFieldProps)
         step={step}
         onChange={(e) => {
           const raw = e.target.value;
-          if (raw === '') return; // ignore empty rather than write NaN
+          if (raw === '') return;
           const n = Number(raw);
           if (!Number.isFinite(n)) return;
           onChange(n);
         }}
-        className="w-full text-sm border border-border rounded px-2 py-1 bg-background"
+        className="w-full text-sm border border-border rounded-md px-2 py-1 bg-background focus:outline-none focus:ring-1 focus:ring-primary/50 tabular-nums"
       />
     </label>
   );
@@ -261,26 +286,22 @@ function ColorField({
   value: string;
   onChange: (v: string) => void;
 }) {
-  // Browser <input type="color"> requires #rrggbb. Fall back to black if the
-  // current value isn't a hex literal (e.g. an `hsl(...)` string).
   const safe = /^#[0-9a-fA-F]{6}$/.test(value) ? value : '#000000';
   return (
     <label className="flex-1 min-w-0 block">
-      <span className="block text-[10px] uppercase tracking-wider text-muted-foreground mb-1">
-        {label}
-      </span>
-      <div className="flex items-center gap-2">
+      <Label>{label}</Label>
+      <div className="flex items-center gap-2 border border-border rounded-md px-1.5 py-1 bg-background focus-within:ring-1 focus-within:ring-primary/50">
         <input
           type="color"
           value={safe}
           onChange={(e) => onChange(e.target.value)}
-          className="h-7 w-9 border border-border rounded cursor-pointer bg-background"
+          className="h-5 w-6 rounded cursor-pointer bg-transparent border-0 p-0"
         />
         <input
           type="text"
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          className="flex-1 min-w-0 text-xs font-mono border border-border rounded px-2 py-1 bg-background"
+          className="flex-1 min-w-0 text-xs font-mono bg-transparent focus:outline-none"
         />
       </div>
     </label>
