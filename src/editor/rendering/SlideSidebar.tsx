@@ -8,7 +8,7 @@
  * Now shows a numbered "filmstrip" with a 16:9 thumbnail rectangle and
  * the slide name underneath, mimicking Slides/PowerPoint.
  */
-import React from 'react';
+import React, { useState } from 'react';
 import { Copy, Plus, Trash2 } from 'lucide-react';
 import {
   useCurrentDeck,
