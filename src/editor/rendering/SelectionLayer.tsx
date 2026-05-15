@@ -271,6 +271,8 @@ export function SelectionLayer({ slide }: SelectionLayerProps) {
     window.addEventListener('pointermove', onPointerMove);
     window.addEventListener('pointerup', endDrag);
     window.addEventListener('pointercancel', endDrag);
+    // Open one history transaction for the full drag.
+    beginHistory();
   };
 
   // ── Resize ────────────────────────────────────────────────────────────
