@@ -392,6 +392,7 @@ export function SelectionLayer({ slide }: SelectionLayerProps) {
     window.addEventListener('pointermove', onResizePointerMove);
     window.addEventListener('pointerup', endResize);
     window.addEventListener('pointercancel', endResize);
+    beginHistory();
   };
 
   const onBackgroundPointerDown = (e: React.PointerEvent) => {
