@@ -13,6 +13,7 @@ import { mockDeck } from '@/editor/model/mockDeck';
 import { EditorSlide } from './EditorSlide';
 import { InspectorPanel } from './InspectorPanel';
 import { InsertToolbar } from './InsertToolbar';
+import { IOToolbar } from './IOToolbar';
 import { SlideSidebar } from './SlideSidebar';
 import {
   useCurrentDeck,
