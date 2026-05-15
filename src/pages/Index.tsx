@@ -45,20 +45,9 @@ export default function Index() {
   const [sidebarWidth, setSidebarWidth] = useState(256);
   const [isResizing, setIsResizing] = useState(false);
   
-  // Derive slides from showcaseSlides with deterministic IDs (for presenter notes persistence)
-  const slides = React.useMemo<SlideData[]>(() => 
-    showcaseSlides.map((s) => ({
-      id: `slide-${s.name.toLowerCase().replace(/\s+/g, '-')}`,
-      component: s.component,
-      name: s.name,
-      isWIP: false,
-      description: undefined,
-    })),
-    []
-  );
-
-  // Get current slide ID for presenter notes
+  // Stable id + legacy fallback for presenter notes lookup.
   const currentSlideId = slides[activeSlideIndex]?.id ?? null;
+  const currentLegacySlideId = slides[activeSlideIndex]?.legacyId ?? null;
 
   // Toggle dark mode
   useEffect(() => {
