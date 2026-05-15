@@ -6,6 +6,8 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
 import AudienceWindow from "./pages/AudienceWindow";
 import DevMockDeck from "./pages/DevMockDeck";
+import DeckPicker from "./pages/DeckPicker";
+import DeckEditor from "./pages/DeckEditor";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -20,6 +22,8 @@ const App = () => (
           <Route path="/" element={<Index />} />
           <Route path="/audience" element={<AudienceWindow />} />
           <Route path="/dev/mock-deck" element={<DevMockDeck />} />
+          <Route path="/decks" element={<DeckPicker />} />
+          <Route path="/decks/:id" element={<DeckEditor />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
