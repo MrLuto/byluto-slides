@@ -275,11 +275,13 @@ function ToolButton({
       onClick={onClick}
       disabled={disabled}
       title={title}
+      aria-label={title}
       className={
         'h-8 w-8 inline-flex items-center justify-center rounded-md ' +
         'text-muted-foreground hover:text-foreground ' +
         'hover:bg-muted active:bg-muted/80 ' +
-        'disabled:opacity-40 disabled:hover:bg-transparent disabled:cursor-not-allowed ' +
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background ' +
+        'disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-muted-foreground disabled:cursor-not-allowed ' +
         'transition-colors ' +
         (danger ? 'hover:text-destructive ' : '')
       }
