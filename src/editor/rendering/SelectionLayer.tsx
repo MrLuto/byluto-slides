@@ -488,3 +488,60 @@ function ElementHit({ element, selected, locked, onPointerDown }: ElementHitProp
     />
   );
 }
+
+// ──────────────────────────────────────────────────────────────────────────
+// Resize handles
+//
+// Rendered in slide coordinates so they sit at the four corners of the
+// element's bounding box. Visual size is divided by the current SlideStage
+// scale so handles stay a constant ~10px on screen regardless of zoom.
+// ──────────────────────────────────────────────────────────────────────────
+
+interface ResizeHandlesProps {
+  element: Exclude<SlideElement, { type: 'line' }>;
+  scale: number;
+  onCornerPointerDown: (corner: Corner, e: React.PointerEvent<HTMLDivElement>) => void;
+}
+
+function ResizeHandles({ element, scale, onCornerPointerDown }: ResizeHandlesProps) {
+  const handlePx = 10; // on-screen size
+  const s = Math.max(scale, 0.0001);
+  const sizeSlide = handlePx / s; // size in slide coordinates
+  const half = sizeSlide / 2;
+
+  const corners: Array<{ corner: Corner; cx: number; cy: number; cursor: string }> = [
+    { corner: 'tl', cx: element.x,                     cy: element.y,                      cursor: 'nwse-resize' },
+    { corner: 'tr', cx: element.x + element.width,     cy: element.y,                      cursor: 'nesw-resize' },
+    { corner: 'bl', cx: element.x,                     cy: element.y + element.height,     cursor: 'nesw-resize' },
+    { corner: 'br', cx: element.x + element.width,     cy: element.y + element.height,     cursor: 'nwse-resize' },
+  ];
+
+  return (
+    <>
+      {corners.map(({ corner, cx, cy, cursor }) => (
+        <div
+          key={corner}
+          data-resize-handle={corner}
+          onPointerDown={(e) => onCornerPointerDown(corner, e)}
+          onDragStart={(e) => e.preventDefault()}
+          draggable={false}
+          style={{
+            position: 'absolute',
+            left: cx - half,
+            top: cy - half,
+            width: sizeSlide,
+            height: sizeSlide,
+            background: 'white',
+            border: `${1 / s}px solid hsl(217 91% 60%)`,
+            borderRadius: 2 / s,
+            pointerEvents: 'auto',
+            cursor,
+            touchAction: 'none',
+            userSelect: 'none',
+            zIndex: 1,
+          }}
+        />
+      ))}
+    </>
+  );
+}
