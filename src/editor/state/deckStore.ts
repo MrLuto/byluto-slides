@@ -94,6 +94,26 @@ export const useDeckStore = create<DeckState>((set) => ({
     set(() => ({ zoom: Math.max(10, Math.min(400, Math.round(zoom))) })),
 
   setEditorMode: (editorMode) => set(() => ({ editorMode })),
+
+  updateElement: (slideId, elementId, patch) =>
+    set((s) => {
+      const deck = s.currentDeck;
+      if (!deck) return {};
+      let mutated = false;
+      const slides = deck.slides.map((sl) => {
+        if (sl.id !== slideId) return sl;
+        const elements = sl.elements.map((el) => {
+          if (el.id !== elementId) return el;
+          if (el.locked) return el;
+          mutated = true;
+          // Discriminated-union safe merge: keep `type` from the original.
+          return { ...el, ...patch, type: el.type } as SlideElement;
+        });
+        return { ...sl, elements };
+      });
+      if (!mutated) return {};
+      return { currentDeck: { ...deck, slides } };
+    }),
 }));
 
 // ──────────────────────────────────────────────────────────────────────────
