@@ -100,6 +100,8 @@ export const useDeckStore = create<DeckState>((set) => ({
 
   setEditorMode: (editorMode) => set(() => ({ editorMode })),
 
+  setEditingText: (editingTextId) => set(() => ({ editingTextId })),
+
   updateElement: (slideId, elementId, patch) =>
     set((s) => {
       const deck = s.currentDeck;
