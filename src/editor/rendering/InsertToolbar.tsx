@@ -20,6 +20,8 @@ import {
   createImageElement,
 } from '@/editor/model/defaults';
 import {
+  useCanRedo,
+  useCanUndo,
   useCurrentSlideId,
   useDeckActions,
   useSelectedElementIds,
