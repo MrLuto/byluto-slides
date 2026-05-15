@@ -157,5 +157,6 @@ export const useDeckActions = () =>
       clearSelection: s.clearSelection,
       setZoom: s.setZoom,
       setEditorMode: s.setEditorMode,
+      updateElement: s.updateElement,
     })),
   );
