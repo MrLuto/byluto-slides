@@ -130,6 +130,22 @@ export function SelectionLayer({ slide }: SelectionLayerProps) {
     };
 
     const onKeyDown = (e: KeyboardEvent) => {
+      // Undo / redo work even when typing in form inputs of the editor
+      // chrome (toolbar, inspector). They do NOT trigger inside the inline
+      // text editor — the textarea's own keydown stops propagation first.
+      const mod = e.metaKey || e.ctrlKey;
+      if (mod && (e.key === 'z' || e.key === 'Z')) {
+        e.preventDefault();
+        if (e.shiftKey) useDeckStore.getState().redo();
+        else useDeckStore.getState().undo();
+        return;
+      }
+      if (mod && (e.key === 'y' || e.key === 'Y')) {
+        e.preventDefault();
+        useDeckStore.getState().redo();
+        return;
+      }
+
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       if (isEditableTarget(e.target)) return;
       // Belt-and-suspenders: even if focus has slipped, never nudge while
