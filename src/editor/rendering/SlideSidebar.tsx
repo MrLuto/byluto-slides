@@ -112,8 +112,6 @@ export function SlideSidebar() {
                 >
                   <SlideThumb slide={sl} />
                 </span>
-
-                />
               </button>
               <div
                 className={
