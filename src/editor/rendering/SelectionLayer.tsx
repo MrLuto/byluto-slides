@@ -230,6 +230,8 @@ export function SelectionLayer({ slide }: SelectionLayerProps) {
     window.removeEventListener('pointerup', endDrag);
     window.removeEventListener('pointercancel', endDrag);
     dragRef.current = null;
+    // Commit one history entry for the entire drag gesture.
+    endHistory();
   };
 
   const beginDrag = (
