@@ -79,7 +79,9 @@ interface ResizeState {
 
 export function SelectionLayer({ slide }: SelectionLayerProps) {
   const selectedIds = useSelectedElementIds();
-  const { selectElement, clearSelection, updateElement } = useDeckActions();
+  const { selectElement, clearSelection, updateElement, setEditingText } =
+    useDeckActions();
+  const editingTextId = useEditingTextId();
   const scale = useSlideScale();
 
   // Refs that need to read current values without re-binding handlers.
