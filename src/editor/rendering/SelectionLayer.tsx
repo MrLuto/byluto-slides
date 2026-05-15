@@ -426,7 +426,10 @@ export function SelectionLayer({ slide }: SelectionLayerProps) {
               onChange={(text) =>
                 updateElement(slideIdRef.current, el.id, { text })
               }
-              onExit={() => setEditingText(null)}
+              onExit={() => {
+                setEditingText(null);
+                endHistory();
+              }}
             />
           );
         }
@@ -441,6 +444,8 @@ export function SelectionLayer({ slide }: SelectionLayerProps) {
               el.type === 'text' && !el.locked
                 ? () => {
                     selectElement(el.id);
+                    // Group all keystrokes during this edit into one entry.
+                    beginHistory();
                     setEditingText(el.id);
                   }
                 : undefined
@@ -453,6 +458,7 @@ export function SelectionLayer({ slide }: SelectionLayerProps) {
               // Any pointerdown elsewhere exits inline text edit.
               if (editingTextId != null && editingTextId !== el.id) {
                 setEditingText(null);
+                endHistory();
               }
 
               const additive = e.shiftKey;
