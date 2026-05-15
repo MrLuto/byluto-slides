@@ -12,6 +12,7 @@ import { SlideStage } from '@/slides/runtime/SlideStage';
 import { mockDeck } from '@/editor/model/mockDeck';
 import { EditorSlide } from './EditorSlide';
 import { InspectorPanel } from './InspectorPanel';
+import { InsertToolbar } from './InsertToolbar';
 import {
   useCurrentDeck,
   useCurrentSlide,
