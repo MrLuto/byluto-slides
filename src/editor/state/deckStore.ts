@@ -168,5 +168,6 @@ export const useDeckActions = () =>
       setZoom: s.setZoom,
       setEditorMode: s.setEditorMode,
       updateElement: s.updateElement,
+      setEditingText: s.setEditingText,
     })),
   );
