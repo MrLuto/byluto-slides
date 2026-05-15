@@ -39,6 +39,16 @@ interface DeckState {
   clearSelection: () => void;
   setZoom: (zoom: number) => void;
   setEditorMode: (mode: EditorMode) => void;
+  /**
+   * Patch a single element on a slide. Pass any subset of element fields
+   * (e.g. `{ x, y }` during a drag). No-ops if the slide or element is
+   * missing, or the element is locked.
+   */
+  updateElement: (
+    slideId: ID,
+    elementId: ID,
+    patch: Partial<SlideElement>,
+  ) => void;
 }
 
 export const useDeckStore = create<DeckState>((set) => ({
