@@ -36,6 +36,7 @@ import {
   useSelectedElementIds,
   useDeckActions,
   useDeckStore,
+  useEditingTextId,
 } from '@/editor/state/deckStore';
 import { useSlideScale } from '@/slides/runtime/SlideStage';
 
