@@ -63,6 +63,23 @@ interface DeckState {
    * elements are skipped. Clears selection + text-edit mode.
    */
   deleteSelectedElements: () => void;
+  /** Append a new blank slide and select it. */
+  addSlide: () => void;
+  /**
+   * Duplicate the current slide. The new slide gets a fresh ID and every
+   * element inside it is rewritten with a fresh ID too — we walk the
+   * element list and replace `el.id` via `crypto.randomUUID()` so nothing
+   * collides with the original. The duplicate is inserted right after the
+   * source and selected.
+   */
+  duplicateCurrentSlide: () => void;
+  /**
+   * Remove the current slide. No-ops if only one slide remains. After
+   * removal, selects the slide at the same index (or the new last slide).
+   */
+  deleteCurrentSlide: () => void;
+  /** Reorder a slide. Indices are clamped; positions are renumbered. */
+  moveSlide: (fromIndex: number, toIndex: number) => void;
 }
 
 export const useDeckStore = create<DeckState>((set) => ({
@@ -179,7 +196,101 @@ export const useDeckStore = create<DeckState>((set) => ({
         editingTextId: null,
       };
     }),
+
+  addSlide: () =>
+    set((s) => {
+      const deck = s.currentDeck;
+      if (!deck) return {};
+      const ts = new Date().toISOString();
+      const newSlide: Slide = {
+        id: newId(),
+        position: deck.slides.length,
+        background: deck.slides[0]?.background ?? { type: 'solid', color: '#FFFFFF' },
+        elements: [],
+        createdAt: ts,
+        updatedAt: ts,
+      };
+      return {
+        currentDeck: { ...deck, slides: [...deck.slides, newSlide] },
+        currentSlideId: newSlide.id,
+        selectedElementIds: [],
+        editingTextId: null,
+      };
+    }),
+
+  duplicateCurrentSlide: () =>
+    set((s) => {
+      const deck = s.currentDeck;
+      if (!deck || !s.currentSlideId) return {};
+      const idx = deck.slides.findIndex((sl) => sl.id === s.currentSlideId);
+      if (idx < 0) return {};
+      const src = deck.slides[idx];
+      // Fresh ID for the slide and for every element so nothing collides.
+      const dup: Slide = {
+        ...src,
+        id: newId(),
+        name: src.name ? `${src.name} copy` : undefined,
+        elements: src.elements.map((el) => ({ ...el, id: newId() })),
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      const slides = [
+        ...deck.slides.slice(0, idx + 1),
+        dup,
+        ...deck.slides.slice(idx + 1),
+      ].map((sl, i) => ({ ...sl, position: i }));
+      return {
+        currentDeck: { ...deck, slides },
+        currentSlideId: dup.id,
+        selectedElementIds: [],
+        editingTextId: null,
+      };
+    }),
+
+  deleteCurrentSlide: () =>
+    set((s) => {
+      const deck = s.currentDeck;
+      if (!deck || !s.currentSlideId) return {};
+      if (deck.slides.length <= 1) return {}; // never delete the last one
+      const idx = deck.slides.findIndex((sl) => sl.id === s.currentSlideId);
+      if (idx < 0) return {};
+      const slides = deck.slides
+        .filter((_, i) => i !== idx)
+        .map((sl, i) => ({ ...sl, position: i }));
+      const nextIdx = Math.min(idx, slides.length - 1);
+      return {
+        currentDeck: { ...deck, slides },
+        currentSlideId: slides[nextIdx].id,
+        selectedElementIds: [],
+        editingTextId: null,
+      };
+    }),
+
+  moveSlide: (fromIndex, toIndex) =>
+    set((s) => {
+      const deck = s.currentDeck;
+      if (!deck) return {};
+      const len = deck.slides.length;
+      const from = Math.max(0, Math.min(len - 1, fromIndex));
+      const to = Math.max(0, Math.min(len - 1, toIndex));
+      if (from === to) return {};
+      const next = [...deck.slides];
+      const [moved] = next.splice(from, 1);
+      next.splice(to, 0, moved);
+      const slides = next.map((sl, i) => ({ ...sl, position: i }));
+      return { currentDeck: { ...deck, slides } };
+    }),
 }));
+
+// Local helper for slide actions — keeps `defaults.ts` import out of the
+// module top-level type cycle and lets us regenerate ids without pulling in
+// the whole factory layer.
+const newId = (): ID => {
+  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+    return crypto.randomUUID();
+  }
+  return 'id-' + Math.random().toString(36).slice(2) + Date.now().toString(36);
+};
 
 // ──────────────────────────────────────────────────────────────────────────
 // Granular selector hooks
@@ -227,5 +338,9 @@ export const useDeckActions = () =>
       setEditingText: s.setEditingText,
       addElement: s.addElement,
       deleteSelectedElements: s.deleteSelectedElements,
+      addSlide: s.addSlide,
+      duplicateCurrentSlide: s.duplicateCurrentSlide,
+      deleteCurrentSlide: s.deleteCurrentSlide,
+      moveSlide: s.moveSlide,
     })),
   );
