@@ -12,6 +12,7 @@ import { SlideStage } from '@/slides/runtime/SlideStage';
 import { mockDeck } from '@/editor/model/mockDeck';
 import { EditorSlide } from './EditorSlide';
 import { InspectorPanel } from './InspectorPanel';
+import { InsertToolbar } from './InsertToolbar';
 import {
   useCurrentDeck,
   useCurrentSlide,
@@ -50,6 +51,7 @@ export function MockDeckPreview() {
 
   return (
     <div className="flex flex-col h-full w-full bg-[hsl(var(--canvas-bg,0_0%_96%))]">
+      <InsertToolbar />
       <div className="flex-1 min-h-0 flex">
         <div className="flex-1 min-w-0 p-8 overflow-hidden">
           <SlideStage mode="edit" zoom={zoom}>
