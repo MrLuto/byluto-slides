@@ -53,7 +53,15 @@ const PLACEHOLDER_IMAGE_SRC =
     </svg>`,
   );
 
-export function EditorTopBar() {
+export interface EditorTopBarProps {
+  /** Editable deck title shown next to the brand. Falls back to deck.title. */
+  title?: string;
+  onTitleChange?: (next: string) => void;
+  /** Persistence indicator shown in the brand chip. */
+  mode?: 'cloud' | 'local';
+}
+
+export function EditorTopBar({ title, onTitleChange, mode }: EditorTopBarProps = {}) {
   const slideId = useCurrentSlideId();
   const deck = useCurrentDeck();
   const selected = useSelectedElementIds();
@@ -140,12 +148,34 @@ export function EditorTopBar() {
 
   return (
     <div className="flex items-center gap-1 h-12 px-3 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
-      <div className="text-sm font-semibold tracking-tight pr-3 mr-1 border-r border-border h-6 flex items-center">
-        SlideForge
-        <span className="ml-2 px-1.5 py-0.5 text-[10px] font-mono uppercase tracking-wider rounded bg-muted text-muted-foreground">
-          dev
+      <div className="pr-3 mr-1 border-r border-border h-6 flex items-center gap-2">
+        <span className="text-sm font-semibold tracking-tight">SlideForge</span>
+        <span
+          className={
+            'px-1.5 py-0.5 text-[10px] font-mono uppercase tracking-wider rounded ' +
+            (mode === 'cloud'
+              ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400'
+              : 'bg-muted text-muted-foreground')
+          }
+          title={
+            mode === 'cloud'
+              ? 'Saving to your cloud library'
+              : 'Local-only (sign in to save to cloud)'
+          }
+        >
+          {mode === 'cloud' ? 'cloud' : 'local'}
         </span>
       </div>
+      {onTitleChange && (
+        <input
+          type="text"
+          value={title ?? deck?.title ?? ''}
+          onChange={(e) => onTitleChange(e.target.value)}
+          placeholder="Untitled deck"
+          aria-label="Deck title"
+          className="h-7 max-w-[18rem] min-w-0 px-2 text-sm rounded-md bg-transparent border border-transparent hover:border-border focus:border-border focus:bg-background focus:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-colors mr-2"
+        />
+      )}
 
       <Group label="File">
         <ToolButton onClick={() => fileRef.current?.click()} title="Import JSON">

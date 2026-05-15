@@ -35,14 +35,17 @@ import {
   useDeckActions,
   useZoom,
 } from '@/editor/state/deckStore';
-import { useDeckAutosave } from '@/editor/state/useDeckAutosave';
+import { useDeckPersistence } from '@/editor/state/useDeckPersistence';
 
-export function MockDeckPreview() {
+export function MockDeckPreview({ deckId }: { deckId?: string } = {}) {
   const { setCurrentSlide, setZoom } = useDeckActions();
   const deck = useCurrentDeck();
   const slide = useCurrentSlide();
   const zoom = useZoom();
-  const { status, reset } = useDeckAutosave(mockDeck);
+  const { status, mode, title, setTitle, reset } = useDeckPersistence({
+    deckId,
+    fallbackDeck: mockDeck,
+  });
 
   if (!deck || !slide) {
     return (
@@ -61,7 +64,7 @@ export function MockDeckPreview() {
 
   return (
     <div className="flex flex-col h-full w-full bg-muted/30 text-foreground">
-      <EditorTopBar />
+      <EditorTopBar title={title} onTitleChange={setTitle} mode={mode} />
 
       <div className="flex-1 min-h-0 flex">
         <SlideSidebar />
