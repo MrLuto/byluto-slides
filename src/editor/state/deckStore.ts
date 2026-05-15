@@ -133,6 +133,11 @@ export const useDeckStore = create<DeckState>((set) => ({
   editorMode: 'edit',
   editingTextId: null,
 
+  past: [],
+  future: [],
+  _txDepth: 0,
+  _txPre: null,
+
   setDeck: (deck) =>
     set(() => ({
       currentDeck: deck,
@@ -140,12 +145,16 @@ export const useDeckStore = create<DeckState>((set) => ({
       currentSlideId: deck?.slides[0]?.id ?? null,
       selectedElementIds: [],
       editingTextId: null,
+      // Loading a fresh deck is the new baseline — discard prior history.
+      past: [],
+      future: [],
+      _txDepth: 0,
+      _txPre: null,
     })),
 
   setCurrentSlide: (slideId) =>
     set(() => ({
       currentSlideId: slideId,
-      // Selection is per-slide; clear when navigating between slides.
       selectedElementIds: [],
       editingTextId: null,
     })),
@@ -185,13 +194,12 @@ export const useDeckStore = create<DeckState>((set) => ({
           if (el.id !== elementId) return el;
           if (el.locked) return el;
           mutated = true;
-          // Discriminated-union safe merge: keep `type` from the original.
           return { ...el, ...patch, type: el.type } as SlideElement;
         });
         return { ...sl, elements };
       });
       if (!mutated) return {};
-      return { currentDeck: { ...deck, slides } };
+      return withHistory(s, { ...deck, slides });
     }),
 
   addElement: (slideId, element) =>
@@ -207,11 +215,10 @@ export const useDeckStore = create<DeckState>((set) => ({
         return { ...sl, elements: [...sl.elements, withZ] };
       });
       if (!inserted) return {};
-      return {
-        currentDeck: { ...deck, slides },
+      return withHistory(s, { ...deck, slides }, {
         selectedElementIds: [element.id],
         editingTextId: null,
-      };
+      });
     }),
 
   deleteSelectedElements: () =>
@@ -226,18 +233,17 @@ export const useDeckStore = create<DeckState>((set) => ({
         if (sl.id !== slideId) return sl;
         const next = sl.elements.filter((el) => {
           if (!ids.has(el.id)) return true;
-          if (el.locked) return true; // skip locked
+          if (el.locked) return true;
           mutated = true;
           return false;
         });
         return { ...sl, elements: next };
       });
       if (!mutated) return { selectedElementIds: [], editingTextId: null };
-      return {
-        currentDeck: { ...deck, slides },
+      return withHistory(s, { ...deck, slides }, {
         selectedElementIds: [],
         editingTextId: null,
-      };
+      });
     }),
 
   addSlide: () =>
@@ -253,12 +259,15 @@ export const useDeckStore = create<DeckState>((set) => ({
         createdAt: ts,
         updatedAt: ts,
       };
-      return {
-        currentDeck: { ...deck, slides: [...deck.slides, newSlide] },
-        currentSlideId: newSlide.id,
-        selectedElementIds: [],
-        editingTextId: null,
-      };
+      return withHistory(
+        s,
+        { ...deck, slides: [...deck.slides, newSlide] },
+        {
+          currentSlideId: newSlide.id,
+          selectedElementIds: [],
+          editingTextId: null,
+        },
+      );
     }),
 
   duplicateCurrentSlide: () =>
@@ -268,7 +277,6 @@ export const useDeckStore = create<DeckState>((set) => ({
       const idx = deck.slides.findIndex((sl) => sl.id === s.currentSlideId);
       if (idx < 0) return {};
       const src = deck.slides[idx];
-      // Fresh ID for the slide and for every element so nothing collides.
       const dup: Slide = {
         ...src,
         id: newId(),
@@ -282,31 +290,29 @@ export const useDeckStore = create<DeckState>((set) => ({
         dup,
         ...deck.slides.slice(idx + 1),
       ].map((sl, i) => ({ ...sl, position: i }));
-      return {
-        currentDeck: { ...deck, slides },
+      return withHistory(s, { ...deck, slides }, {
         currentSlideId: dup.id,
         selectedElementIds: [],
         editingTextId: null,
-      };
+      });
     }),
 
   deleteCurrentSlide: () =>
     set((s) => {
       const deck = s.currentDeck;
       if (!deck || !s.currentSlideId) return {};
-      if (deck.slides.length <= 1) return {}; // never delete the last one
+      if (deck.slides.length <= 1) return {};
       const idx = deck.slides.findIndex((sl) => sl.id === s.currentSlideId);
       if (idx < 0) return {};
       const slides = deck.slides
         .filter((_, i) => i !== idx)
         .map((sl, i) => ({ ...sl, position: i }));
       const nextIdx = Math.min(idx, slides.length - 1);
-      return {
-        currentDeck: { ...deck, slides },
+      return withHistory(s, { ...deck, slides }, {
         currentSlideId: slides[nextIdx].id,
         selectedElementIds: [],
         editingTextId: null,
-      };
+      });
     }),
 
   moveSlide: (fromIndex, toIndex) =>
@@ -321,7 +327,68 @@ export const useDeckStore = create<DeckState>((set) => ({
       const [moved] = next.splice(from, 1);
       next.splice(to, 0, moved);
       const slides = next.map((sl, i) => ({ ...sl, position: i }));
-      return { currentDeck: { ...deck, slides } };
+      return withHistory(s, { ...deck, slides });
+    }),
+
+  // ── History actions ─────────────────────────────────────────────────
+  beginHistory: () =>
+    set((s) => {
+      if (s._txDepth > 0) return { _txDepth: s._txDepth + 1 };
+      return { _txDepth: 1, _txPre: s.currentDeck };
+    }),
+
+  endHistory: () =>
+    set((s) => {
+      if (s._txDepth <= 0) return {};
+      if (s._txDepth > 1) return { _txDepth: s._txDepth - 1 };
+      const pre = s._txPre;
+      // Commit one history entry iff the deck actually changed.
+      if (pre && s.currentDeck && pre !== s.currentDeck) {
+        const past = [...s.past, pre];
+        if (past.length > HISTORY_LIMIT)
+          past.splice(0, past.length - HISTORY_LIMIT);
+        return { _txDepth: 0, _txPre: null, past, future: [] };
+      }
+      return { _txDepth: 0, _txPre: null };
+    }),
+
+  undo: () =>
+    set((s) => {
+      if (s.past.length === 0 || !s.currentDeck) return {};
+      const prev = s.past[s.past.length - 1];
+      const past = s.past.slice(0, -1);
+      const future = [...s.future, s.currentDeck];
+      // Keep currentSlideId valid against the restored deck.
+      const stillThere = prev.slides.some((sl) => sl.id === s.currentSlideId);
+      return {
+        currentDeck: prev,
+        past,
+        future,
+        currentSlideId: stillThere
+          ? s.currentSlideId
+          : prev.slides[0]?.id ?? null,
+        selectedElementIds: [],
+        editingTextId: null,
+      };
+    }),
+
+  redo: () =>
+    set((s) => {
+      if (s.future.length === 0 || !s.currentDeck) return {};
+      const next = s.future[s.future.length - 1];
+      const future = s.future.slice(0, -1);
+      const past = [...s.past, s.currentDeck];
+      const stillThere = next.slides.some((sl) => sl.id === s.currentSlideId);
+      return {
+        currentDeck: next,
+        past,
+        future,
+        currentSlideId: stillThere
+          ? s.currentSlideId
+          : next.slides[0]?.id ?? null,
+        selectedElementIds: [],
+        editingTextId: null,
+      };
     }),
 }));
 
