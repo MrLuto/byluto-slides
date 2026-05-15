@@ -8,7 +8,7 @@
  * Now shows a numbered "filmstrip" with a 16:9 thumbnail rectangle and
  * the slide name underneath, mimicking Slides/PowerPoint.
  */
-import React from 'react';
+import React, { useState } from 'react';
 import { Copy, Plus, Trash2 } from 'lucide-react';
 import {
   useCurrentDeck,
@@ -47,9 +47,28 @@ export function SlideSidebar() {
     addSlide,
     duplicateCurrentSlide,
     deleteCurrentSlide,
+    moveSlide,
   } = useDeckActions();
 
+  // Native HTML5 DnD state. `dragIndex` is the source row being dragged;
+  // `overIndex` encodes the drop position as an *insertion gap* index in
+  // the range [0, slides.length], where N means "after the last slide".
+  // We render a thin highlighted bar at that gap as drop feedback.
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [overIndex, setOverIndex] = useState<number | null>(null);
+
   if (!deck) return null;
+
+  // Translate an insertion-gap index into the destination index expected
+  // by `moveSlide(fromIndex, toIndex)`. When dragging downward, the source
+  // is removed first, which shifts every later index down by one — so for
+  // gaps strictly after the source we subtract one. Same-position drops
+  // (gap === from or gap === from + 1) are no-ops.
+  const commitDrop = (from: number, gap: number) => {
+    if (gap === from || gap === from + 1) return;
+    const to = gap > from ? gap - 1 : gap;
+    moveSlide(from, to);
+  };
 
   return (
     <aside className="flex flex-col w-56 shrink-0 border-r border-border bg-background/60">
@@ -79,15 +98,68 @@ export function SlideSidebar() {
         </div>
       </div>
 
-      <ul className="flex-1 min-h-0 overflow-y-auto p-2 space-y-1.5">
+      <ul
+        className="flex-1 min-h-0 overflow-y-auto p-2 space-y-1.5"
+        onDragOver={(e) => {
+          // Allow drop when pointer is between rows / past the last row.
+          if (dragIndex !== null) e.preventDefault();
+        }}
+        onDrop={(e) => {
+          if (dragIndex === null) return;
+          e.preventDefault();
+          const gap = overIndex ?? deck.slides.length;
+          commitDrop(dragIndex, gap);
+          setDragIndex(null);
+          setOverIndex(null);
+        }}
+      >
         {deck.slides.map((sl, i) => {
           const active = sl.id === currentId;
+          const isDragging = dragIndex === i;
+          // Show drop indicator above row `i` when overIndex === i, and
+          // below the last row when overIndex === slides.length.
+          const showBarAbove = overIndex === i && dragIndex !== null;
+          const showBarBelow =
+            i === deck.slides.length - 1 &&
+            overIndex === deck.slides.length &&
+            dragIndex !== null;
           return (
-            <li key={sl.id}>
+            <li
+              key={sl.id}
+              draggable
+              onDragStart={(e) => {
+                setDragIndex(i);
+                e.dataTransfer.effectAllowed = 'move';
+                // Required by Firefox to actually start the drag.
+                e.dataTransfer.setData('text/plain', sl.id);
+              }}
+              onDragEnd={() => {
+                setDragIndex(null);
+                setOverIndex(null);
+              }}
+              onDragOver={(e) => {
+                if (dragIndex === null) return;
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+                // Pick the nearer gap (top half → before, bottom half → after).
+                const rect = e.currentTarget.getBoundingClientRect();
+                const before = e.clientY - rect.top < rect.height / 2;
+                setOverIndex(before ? i : i + 1);
+              }}
+            >
+              {/* Top drop indicator */}
+              <div
+                className={
+                  'h-0.5 -my-0.5 rounded-full mx-2 ' +
+                  (showBarAbove ? 'bg-primary' : 'bg-transparent')
+                }
+                aria-hidden
+              />
               <button
                 onClick={() => setCurrentSlide(sl.id)}
                 className={
                   'group w-full flex items-stretch gap-2 p-1.5 rounded-md text-left transition-colors ' +
+                  (isDragging ? 'opacity-40 ' : '') +
                   (active
                     ? 'bg-primary/10 ring-1 ring-primary/40'
                     : 'hover:bg-muted/60')
@@ -121,6 +193,14 @@ export function SlideSidebar() {
               >
                 {sl.name ?? 'Untitled'}
               </div>
+              {/* Bottom drop indicator (only on last row, for "drop at end"). */}
+              <div
+                className={
+                  'h-0.5 mt-1 rounded-full mx-2 ' +
+                  (showBarBelow ? 'bg-primary' : 'bg-transparent')
+                }
+                aria-hidden
+              />
             </li>
           );
         })}
