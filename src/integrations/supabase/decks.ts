@@ -100,10 +100,13 @@ export async function updateDeck(
   id: string,
   patch: { title?: string; deck?: Deck },
 ): Promise<void> {
-  const update: Record<string, unknown> = { updated_at: new Date().toISOString() };
+  const update: {
+    updated_at: string;
+    title?: string;
+    data?: never;
+  } = { updated_at: new Date().toISOString() };
   if (patch.title !== undefined) update.title = patch.title;
-  if (patch.deck !== undefined)
-    update.data = patch.deck as unknown as Record<string, unknown>;
+  if (patch.deck !== undefined) update.data = patch.deck as never;
 
   const { error } = await supabase.from('decks').update(update).eq('id', id);
   if (error) throw error;
