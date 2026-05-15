@@ -13,6 +13,7 @@ import { mockDeck } from '@/editor/model/mockDeck';
 import { EditorSlide } from './EditorSlide';
 import { InspectorPanel } from './InspectorPanel';
 import { InsertToolbar } from './InsertToolbar';
+import { IOToolbar } from './IOToolbar';
 import { SlideSidebar } from './SlideSidebar';
 import {
   useCurrentDeck,
@@ -52,6 +53,7 @@ export function MockDeckPreview() {
 
   return (
     <div className="flex flex-col h-full w-full bg-[hsl(var(--canvas-bg,0_0%_96%))]">
+      <IOToolbar />
       <InsertToolbar />
       <div className="flex-1 min-h-0 flex">
         <SlideSidebar />
