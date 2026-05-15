@@ -50,10 +50,13 @@ export function MockDeckPreview() {
 
   return (
     <div className="flex flex-col h-full w-full bg-[hsl(var(--canvas-bg,0_0%_96%))]">
-      <div className="flex-1 p-8 overflow-hidden">
-        <SlideStage mode="edit" zoom={zoom}>
-          <EditorSlide slide={slide} />
-        </SlideStage>
+      <div className="flex-1 min-h-0 flex">
+        <div className="flex-1 min-w-0 p-8 overflow-hidden">
+          <SlideStage mode="edit" zoom={zoom}>
+            <EditorSlide slide={slide} />
+          </SlideStage>
+        </div>
+        <InspectorPanel />
       </div>
 
       <div className="flex items-center justify-center gap-3 p-3 border-t border-border">
