@@ -42,7 +42,9 @@ const PLACEHOLDER_IMAGE_SRC =
 export function InsertToolbar() {
   const slideId = useCurrentSlideId();
   const selected = useSelectedElementIds();
-  const { addElement, deleteSelectedElements } = useDeckActions();
+  const canUndo = useCanUndo();
+  const canRedo = useCanRedo();
+  const { addElement, deleteSelectedElements, undo, redo } = useDeckActions();
 
   if (!slideId) return null;
 
