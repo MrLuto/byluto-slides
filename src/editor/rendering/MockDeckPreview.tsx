@@ -54,6 +54,7 @@ export function MockDeckPreview() {
     <div className="flex flex-col h-full w-full bg-[hsl(var(--canvas-bg,0_0%_96%))]">
       <InsertToolbar />
       <div className="flex-1 min-h-0 flex">
+        <SlideSidebar />
         <div className="flex-1 min-w-0 p-8 overflow-hidden">
           <SlideStage mode="edit" zoom={zoom}>
             <EditorSlide slide={slide} />
