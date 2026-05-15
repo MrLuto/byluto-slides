@@ -15,6 +15,29 @@ import {
   useCurrentSlideId,
   useDeckActions,
 } from '@/editor/state/deckStore';
+import type { Slide } from '@/editor/model/types';
+import { DataSlideRenderer } from './DataSlideRenderer';
+import { SlideStage } from '@/slides/runtime/SlideStage';
+
+/**
+ * SlideThumb — renders a real miniature of the slide.
+ *
+ * Uses `DataSlideRenderer` directly (NOT `EditorSlide`), so the editor
+ * `SelectionLayer` and its handles never appear in the sidebar.
+ * `SlideStage mode="thumb"` scales 1920×1080 down to fit the 16:9 box and
+ * sets `interactive={false}` by default → all pointer events are blocked,
+ * so clicks bubble to the parent button.
+ *
+ * Memoized on slide identity + reference so unrelated slide edits don't
+ * re-render the entire filmstrip.
+ */
+const SlideThumb = React.memo(function SlideThumb({ slide }: { slide: Slide }) {
+  return (
+    <SlideStage mode="thumb" interactive={false}>
+      <DataSlideRenderer slide={slide} />
+    </SlideStage>
+  );
+});
 
 export function SlideSidebar() {
   const deck = useCurrentDeck();
@@ -59,9 +82,6 @@ export function SlideSidebar() {
       <ul className="flex-1 min-h-0 overflow-y-auto p-2 space-y-1.5">
         {deck.slides.map((sl, i) => {
           const active = sl.id === currentId;
-          const bg =
-            (sl.background as { color?: string } | undefined)?.color ??
-            '#ffffff';
           return (
             <li key={sl.id}>
               <button
@@ -85,12 +105,13 @@ export function SlideSidebar() {
                 </span>
                 <span
                   className={
-                    'flex-1 min-w-0 aspect-video rounded-sm border overflow-hidden shadow-sm ' +
+                    'flex-1 min-w-0 aspect-video rounded-sm border overflow-hidden shadow-sm bg-white ' +
                     (active ? 'border-primary/50' : 'border-border')
                   }
-                  style={{ background: bg }}
                   aria-hidden
-                />
+                >
+                  <SlideThumb slide={sl} />
+                </span>
               </button>
               <div
                 className={
