@@ -1,5 +1,13 @@
+/**
+ * Compatibility wrapper. Delegates to `SlideFrame` while preserving the
+ * original Carbon-inspired visuals (slide-primary dark surface, slide-accent
+ * bottom bar, SLIDEFORGE wordmark in the brand slot).
+ *
+ * The wordmark lives here, not in SlideFrame, so the frame stays brand-agnostic.
+ */
 import React from 'react';
 import { cn } from '@/lib/utils';
+import { SlideFrame } from '@/slides/runtime/SlideFrame';
 
 interface MSSlideLayoutProps {
   children: React.ReactNode;
@@ -7,40 +15,26 @@ interface MSSlideLayoutProps {
   className?: string;
 }
 
-/**
- * Slide Layout Component
- * Inspired by IBM Carbon Design System
- * 
- * Variants:
- * - default: White background, dark text
- * - dark/title: Deep navy background, white text
- */
+/** @deprecated Use <SlideFrame> directly and pass your own brandMark/accent. */
 export function MSSlideLayout({ children, variant = 'default', className }: MSSlideLayoutProps) {
   const isDark = variant === 'dark' || variant === 'title';
-  
+
   return (
-    <div 
-      className={cn(
-        'w-full h-full relative font-sans slide-content',
-        isDark 
-          ? 'bg-slide-primary text-white' 
-          : 'bg-[#FCFBF8] text-slide-gray-900',
-        className
-      )}
+    <SlideFrame
+      // Preserve the original token-based surfaces exactly.
+      background={
+        isDark
+          ? 'bg-slide-primary text-white'
+          : 'bg-[#FCFBF8] text-slide-gray-900'
+      }
+      className={className}
+      brandMark={<LogoMark variant={isDark ? 'light' : 'dark'} />}
+      accent={
+        <div className="absolute bottom-0 left-0 right-0 h-1 bg-slide-accent" />
+      }
     >
-      {/* Logo mark - Top Right */}
-      <div className="absolute top-8 right-10 z-10">
-        <LogoMark variant={isDark ? 'light' : 'dark'} />
-      </div>
-      
-      {/* Content */}
-      <div className="w-full h-full">
-        {children}
-      </div>
-      
-      {/* Bottom accent bar */}
-      <div className="absolute bottom-0 left-0 right-0 h-1 bg-slide-accent" />
-    </div>
+      {children}
+    </SlideFrame>
   );
 }
 
@@ -49,19 +43,13 @@ interface LogoMarkProps {
   className?: string;
 }
 
-/**
- * Minimal logo mark - can be customized per brand
- */
+/** Minimal placeholder wordmark — only used by the legacy MSSlideLayout shim. */
 export function LogoMark({ variant = 'dark', className }: LogoMarkProps) {
-  const color = variant === 'light' ? 'hsl(var(--slide-gray-100))' : 'hsl(var(--slide-primary))';
-  
+  const color =
+    variant === 'light' ? 'hsl(var(--slide-gray-100))' : 'hsl(var(--slide-primary))';
+
   return (
-    <svg
-      viewBox="0 0 120 24"
-      className={cn('h-5 w-auto', className)}
-      fill={color}
-    >
-      {/* Clean wordmark placeholder */}
+    <svg viewBox="0 0 120 24" className={cn('h-5 w-auto', className)} fill={color}>
       <text
         x="0"
         y="17"
