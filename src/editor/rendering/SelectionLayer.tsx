@@ -82,6 +82,64 @@ export function SelectionLayer({ slide }: SelectionLayerProps) {
     };
   }, [slide.id]);
 
+  // ── Keyboard nudging ──────────────────────────────────────────────────
+  // Window-level listener, but mounted only while this component is in the
+  // tree. Since SelectionLayer only renders inside the dev mock-deck route
+  // (via EditorSlide → MockDeckPreview), the shortcut cannot leak into the
+  // legacy showcase app. Arrow = 1 unit, Shift+Arrow = 10 units. We read
+  // the freshest selection + slide directly from the store so the handler
+  // never closes over stale values.
+  useEffect(() => {
+    const isEditableTarget = (t: EventTarget | null) => {
+      if (!(t instanceof HTMLElement)) return false;
+      const tag = t.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return true;
+      if (t.isContentEditable) return true;
+      return false;
+    };
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      if (isEditableTarget(e.target)) return;
+
+      let dx = 0;
+      let dy = 0;
+      switch (e.key) {
+        case 'ArrowLeft':  dx = -1; break;
+        case 'ArrowRight': dx =  1; break;
+        case 'ArrowUp':    dy = -1; break;
+        case 'ArrowDown':  dy =  1; break;
+        default: return;
+      }
+
+      const state = useDeckStore.getState();
+      const ids = state.selectedElementIds;
+      if (ids.length === 0) return;
+
+      const sId = slideIdRef.current;
+      const sl = state.currentDeck?.slides.find((x) => x.id === sId);
+      if (!sl) return;
+
+      const step = e.shiftKey ? 10 : 1;
+      e.preventDefault(); // block page scroll
+
+      for (const id of ids) {
+        const el = sl.elements.find((x) => x.id === id);
+        if (!el) continue;
+        if (el.locked || el.hidden) continue;
+        if (el.type === 'line') continue; // matches drag policy
+        updateElement(sId, id, {
+          x: el.x + dx * step,
+          y: el.y + dy * step,
+        });
+      }
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [updateElement]);
+
+
   const flushDrag = () => {
     const drag = dragRef.current;
     if (!drag) return;
