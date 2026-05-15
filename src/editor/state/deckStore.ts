@@ -225,5 +225,7 @@ export const useDeckActions = () =>
       setEditorMode: s.setEditorMode,
       updateElement: s.updateElement,
       setEditingText: s.setEditingText,
+      addElement: s.addElement,
+      deleteSelectedElements: s.deleteSelectedElements,
     })),
   );
