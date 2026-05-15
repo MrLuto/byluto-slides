@@ -211,7 +211,7 @@ export function EditorTopBar() {
         </ToolButton>
       </Group>
 
-      <div className="ml-auto flex items-center">
+      <div className="ml-auto flex items-center gap-2">
         {msg && (
           <span
             className={
@@ -224,7 +224,14 @@ export function EditorTopBar() {
             {msg.text}
           </span>
         )}
+        <ToolButton
+          onClick={() => setShortcutsOpen(true)}
+          title="Keyboard shortcuts (?)"
+        >
+          <Keyboard className="h-4 w-4" />
+        </ToolButton>
       </div>
+      <ShortcutsDialog open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
     </div>
   );
 }
