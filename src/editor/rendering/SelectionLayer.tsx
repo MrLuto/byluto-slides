@@ -465,10 +465,15 @@ export function SelectionLayer({ slide }: SelectionLayerProps) {
         );
       })}
 
-      {/* Resize handles: only when exactly one resizable element is selected. */}
+      {/* Resize handles: only when exactly one resizable element is selected
+          and we're not in inline text-edit mode. */}
       {(() => {
         if (selectedIds.length !== 1) return null;
+        if (editingTextId != null) return null;
         const el = slide.elements.find((e) => e.id === selectedIds[0]);
+        if (!el) return null;
+        if (el.hidden || el.locked) return null;
+        if (el.type === 'line') return null;
         if (!el) return null;
         if (el.hidden || el.locked) return null;
         if (el.type === 'line') return null;
