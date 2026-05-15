@@ -1,5 +1,5 @@
 /**
- * SelectionLayer — selection + drag-to-move overlay (Phase 3C).
+ * SelectionLayer — selection + drag-to-move + resize overlay (Phase 3C–3E).
  *
  * Lives inside the same 1920×1080 coordinate space as `DataSlideRenderer`,
  * as a separate sibling layer. Responsibilities:
@@ -7,26 +7,28 @@
  *   - capture clicks on empty slide space      → `clearSelection`
  *   - draw a selection outline on selected elements
  *   - drag to move all currently-selected elements together
+ *   - resize a single selected element via 4 corner handles
+ *   - keyboard nudging (1 / 10 units) for the current selection
  *
- * It does NOT mutate elements other than translating x/y (no resize, no
- * text edit). `ElementRenderer` uses `pointer-events: none`, so we mirror
- * each element's bounding box here as a transparent hit target with
- * `pointer-events: auto`. Lines are skipped for now — they'll get
- * hit-testing/move support in a later phase.
+ * It only mutates element x/y (move + resize) and width/height (resize).
+ * No rotation, no text edit. `ElementRenderer` uses `pointer-events: none`,
+ * so we mirror each element's bounding box here as a transparent hit
+ * target with `pointer-events: auto`. Lines are skipped — they'll get
+ * hit-testing/move/resize support in a later phase.
  *
  * Coordinate conversion:
  *   The slide is rendered through `SlideStage`, which applies a CSS scale
  *   to fit a 1920×1080 surface inside the visible canvas. We read that
  *   scale via `useSlideScale()` and divide pointer deltas (screen pixels)
- *   by it to get canvas-space deltas. Example: at scale 0.5 the user moves
- *   100 screen px → 200 slide-coordinate px.
+ *   by it to get canvas-space deltas. Example: at scale 0.5, 100 screen
+ *   px → 200 slide-coord px.
  *
  * State updates:
  *   We do NOT call `updateElement` on every `mousemove`. Instead we cache
  *   the latest pointer event in a ref and flush a single batched update
- *   per animation frame via `requestAnimationFrame`. The drag start
- *   snapshot of element positions is held in a ref so we never read stale
- *   x/y from the store mid-drag.
+ *   per animation frame via `requestAnimationFrame`. Drag-start / resize-
+ *   start snapshots are held in refs so we never read stale values from
+ *   the store mid-gesture.
  */
 import React, { useEffect, useRef } from 'react';
 import type { ID, Slide, SlideElement } from '@/editor/model/types';
@@ -58,6 +60,21 @@ interface DragState {
 }
 
 const DRAG_THRESHOLD_PX = 2;
+const MIN_SIZE = 20;
+
+type Corner = 'tl' | 'tr' | 'bl' | 'br';
+
+interface ResizeState {
+  pointerId: number;
+  elementId: ID;
+  corner: Corner;
+  startClientX: number;
+  startClientY: number;
+  origin: { x: number; y: number; w: number; h: number };
+  rafId: number | null;
+  lastClientX: number;
+  lastClientY: number;
+}
 
 export function SelectionLayer({ slide }: SelectionLayerProps) {
   const selectedIds = useSelectedElementIds();
@@ -71,6 +88,7 @@ export function SelectionLayer({ slide }: SelectionLayerProps) {
   slideIdRef.current = slide.id;
 
   const dragRef = useRef<DragState | null>(null);
+  const resizeRef = useRef<ResizeState | null>(null);
 
   // Cancel any in-flight rAF on unmount or slide change.
   useEffect(() => {
@@ -78,7 +96,11 @@ export function SelectionLayer({ slide }: SelectionLayerProps) {
       if (dragRef.current?.rafId != null) {
         cancelAnimationFrame(dragRef.current.rafId);
       }
+      if (resizeRef.current?.rafId != null) {
+        cancelAnimationFrame(resizeRef.current.rafId);
+      }
       dragRef.current = null;
+      resizeRef.current = null;
     };
   }, [slide.id]);
 
@@ -227,6 +249,124 @@ export function SelectionLayer({ slide }: SelectionLayerProps) {
     window.addEventListener('pointercancel', endDrag);
   };
 
+  // ── Resize ────────────────────────────────────────────────────────────
+  // Per-corner math, given origin (x0,y0,w0,h0) and slide-coord deltas
+  // (dx, dy):
+  //   br: right = x0+w0+dx, bottom = y0+h0+dy → newW=right-x0, newH=bottom-y0
+  //   bl: left  = x0+dx,    bottom = y0+h0+dy → newW=(x0+w0)-left, newH=bottom-y0,
+  //                                              newX = (x0+w0) - newW
+  //   tr: right = x0+w0+dx, top    = y0+dy    → newW=right-x0,  newH=(y0+h0)-top,
+  //                                              newY = (y0+h0) - newH
+  //   tl: left  = x0+dx,    top    = y0+dy    → newW=(x0+w0)-left, newH=(y0+h0)-top,
+  //                                              newX = (x0+w0)-newW, newY = (y0+h0)-newH
+  // After clamping width/height to >= MIN_SIZE we recompute x/y from the
+  // fixed (non-moving) edge so the element doesn't drift past its anchor.
+
+  const flushResize = () => {
+    const r = resizeRef.current;
+    if (!r) return;
+    r.rafId = null;
+
+    const s = scaleRef.current || 1;
+    const dx = (r.lastClientX - r.startClientX) / s;
+    const dy = (r.lastClientY - r.startClientY) / s;
+    const { x: x0, y: y0, w: w0, h: h0 } = r.origin;
+    const right0 = x0 + w0;
+    const bottom0 = y0 + h0;
+
+    let newX = x0;
+    let newY = y0;
+    let newW = w0;
+    let newH = h0;
+
+    switch (r.corner) {
+      case 'br': {
+        newW = Math.max(MIN_SIZE, w0 + dx);
+        newH = Math.max(MIN_SIZE, h0 + dy);
+        break;
+      }
+      case 'bl': {
+        newW = Math.max(MIN_SIZE, w0 - dx);
+        newH = Math.max(MIN_SIZE, h0 + dy);
+        newX = right0 - newW;
+        break;
+      }
+      case 'tr': {
+        newW = Math.max(MIN_SIZE, w0 + dx);
+        newH = Math.max(MIN_SIZE, h0 - dy);
+        newY = bottom0 - newH;
+        break;
+      }
+      case 'tl': {
+        newW = Math.max(MIN_SIZE, w0 - dx);
+        newH = Math.max(MIN_SIZE, h0 - dy);
+        newX = right0 - newW;
+        newY = bottom0 - newH;
+        break;
+      }
+    }
+
+    updateElement(slideIdRef.current, r.elementId, {
+      x: Math.round(newX),
+      y: Math.round(newY),
+      width: Math.round(newW),
+      height: Math.round(newH),
+    });
+  };
+
+  const onResizePointerMove = (e: PointerEvent) => {
+    const r = resizeRef.current;
+    if (!r || e.pointerId !== r.pointerId) return;
+    r.lastClientX = e.clientX;
+    r.lastClientY = e.clientY;
+    if (r.rafId == null) r.rafId = requestAnimationFrame(flushResize);
+  };
+
+  const endResize = (e: PointerEvent) => {
+    const r = resizeRef.current;
+    if (!r || e.pointerId !== r.pointerId) return;
+    if (r.rafId != null) {
+      cancelAnimationFrame(r.rafId);
+      flushResize();
+    }
+    window.removeEventListener('pointermove', onResizePointerMove);
+    window.removeEventListener('pointerup', endResize);
+    window.removeEventListener('pointercancel', endResize);
+    resizeRef.current = null;
+  };
+
+  const beginResize = (
+    pointerId: number,
+    clientX: number,
+    clientY: number,
+    elementId: ID,
+    corner: Corner,
+  ) => {
+    const deck = useDeckStore.getState().currentDeck;
+    if (!deck) return;
+    const sl = deck.slides.find((x) => x.id === slideIdRef.current);
+    if (!sl) return;
+    const el = sl.elements.find((e) => e.id === elementId);
+    if (!el) return;
+    if (el.locked || el.hidden) return;
+    if (el.type === 'line') return;
+
+    resizeRef.current = {
+      pointerId,
+      elementId,
+      corner,
+      startClientX: clientX,
+      startClientY: clientY,
+      lastClientX: clientX,
+      lastClientY: clientY,
+      origin: { x: el.x, y: el.y, w: el.width, h: el.height },
+      rafId: null,
+    };
+    window.addEventListener('pointermove', onResizePointerMove);
+    window.addEventListener('pointerup', endResize);
+    window.addEventListener('pointercancel', endResize);
+  };
+
   const onBackgroundPointerDown = (e: React.PointerEvent) => {
     if (e.target !== e.currentTarget) return;
     clearSelection();
@@ -286,6 +426,26 @@ export function SelectionLayer({ slide }: SelectionLayerProps) {
           />
         );
       })}
+
+      {/* Resize handles: only when exactly one resizable element is selected. */}
+      {(() => {
+        if (selectedIds.length !== 1) return null;
+        const el = slide.elements.find((e) => e.id === selectedIds[0]);
+        if (!el) return null;
+        if (el.hidden || el.locked) return null;
+        if (el.type === 'line') return null;
+        return (
+          <ResizeHandles
+            element={el}
+            scale={scale}
+            onCornerPointerDown={(corner, e) => {
+              e.stopPropagation();
+              e.preventDefault();
+              beginResize(e.pointerId, e.clientX, e.clientY, el.id, corner);
+            }}
+          />
+        );
+      })()}
     </div>
   );
 }
@@ -326,5 +486,62 @@ function ElementHit({ element, selected, locked, onPointerDown }: ElementHitProp
         touchAction: 'none',
       }}
     />
+  );
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// Resize handles
+//
+// Rendered in slide coordinates so they sit at the four corners of the
+// element's bounding box. Visual size is divided by the current SlideStage
+// scale so handles stay a constant ~10px on screen regardless of zoom.
+// ──────────────────────────────────────────────────────────────────────────
+
+interface ResizeHandlesProps {
+  element: Exclude<SlideElement, { type: 'line' }>;
+  scale: number;
+  onCornerPointerDown: (corner: Corner, e: React.PointerEvent<HTMLDivElement>) => void;
+}
+
+function ResizeHandles({ element, scale, onCornerPointerDown }: ResizeHandlesProps) {
+  const handlePx = 10; // on-screen size
+  const s = Math.max(scale, 0.0001);
+  const sizeSlide = handlePx / s; // size in slide coordinates
+  const half = sizeSlide / 2;
+
+  const corners: Array<{ corner: Corner; cx: number; cy: number; cursor: string }> = [
+    { corner: 'tl', cx: element.x,                     cy: element.y,                      cursor: 'nwse-resize' },
+    { corner: 'tr', cx: element.x + element.width,     cy: element.y,                      cursor: 'nesw-resize' },
+    { corner: 'bl', cx: element.x,                     cy: element.y + element.height,     cursor: 'nesw-resize' },
+    { corner: 'br', cx: element.x + element.width,     cy: element.y + element.height,     cursor: 'nwse-resize' },
+  ];
+
+  return (
+    <>
+      {corners.map(({ corner, cx, cy, cursor }) => (
+        <div
+          key={corner}
+          data-resize-handle={corner}
+          onPointerDown={(e) => onCornerPointerDown(corner, e)}
+          onDragStart={(e) => e.preventDefault()}
+          draggable={false}
+          style={{
+            position: 'absolute',
+            left: cx - half,
+            top: cy - half,
+            width: sizeSlide,
+            height: sizeSlide,
+            background: 'white',
+            border: `${1 / s}px solid hsl(217 91% 60%)`,
+            borderRadius: 2 / s,
+            pointerEvents: 'auto',
+            cursor,
+            touchAction: 'none',
+            userSelect: 'none',
+            zIndex: 1,
+          }}
+        />
+      ))}
+    </>
   );
 }
