@@ -17,7 +17,7 @@
  */
 import { create } from 'zustand';
 import { useShallow } from 'zustand/react/shallow';
-import type { Deck, ID, Slide } from '@/editor/model/types';
+import type { Deck, ID, Slide, SlideElement } from '@/editor/model/types';
 
 export type EditorMode = 'edit' | 'preview';
 
@@ -39,6 +39,16 @@ interface DeckState {
   clearSelection: () => void;
   setZoom: (zoom: number) => void;
   setEditorMode: (mode: EditorMode) => void;
+  /**
+   * Patch a single element on a slide. Pass any subset of element fields
+   * (e.g. `{ x, y }` during a drag). No-ops if the slide or element is
+   * missing, or the element is locked.
+   */
+  updateElement: (
+    slideId: ID,
+    elementId: ID,
+    patch: Partial<SlideElement>,
+  ) => void;
 }
 
 export const useDeckStore = create<DeckState>((set) => ({
@@ -84,6 +94,26 @@ export const useDeckStore = create<DeckState>((set) => ({
     set(() => ({ zoom: Math.max(10, Math.min(400, Math.round(zoom))) })),
 
   setEditorMode: (editorMode) => set(() => ({ editorMode })),
+
+  updateElement: (slideId, elementId, patch) =>
+    set((s) => {
+      const deck = s.currentDeck;
+      if (!deck) return {};
+      let mutated = false;
+      const slides = deck.slides.map((sl) => {
+        if (sl.id !== slideId) return sl;
+        const elements = sl.elements.map((el) => {
+          if (el.id !== elementId) return el;
+          if (el.locked) return el;
+          mutated = true;
+          // Discriminated-union safe merge: keep `type` from the original.
+          return { ...el, ...patch, type: el.type } as SlideElement;
+        });
+        return { ...sl, elements };
+      });
+      if (!mutated) return {};
+      return { currentDeck: { ...deck, slides } };
+    }),
 }));
 
 // ──────────────────────────────────────────────────────────────────────────
@@ -127,5 +157,6 @@ export const useDeckActions = () =>
       clearSelection: s.clearSelection,
       setZoom: s.setZoom,
       setEditorMode: s.setEditorMode,
+      updateElement: s.updateElement,
     })),
   );
