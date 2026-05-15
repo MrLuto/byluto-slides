@@ -61,6 +61,7 @@ export const useDeckStore = create<DeckState>((set) => ({
   selectedElementIds: [],
   zoom: 100,
   editorMode: 'edit',
+  editingTextId: null,
 
   setDeck: (deck) =>
     set(() => ({
