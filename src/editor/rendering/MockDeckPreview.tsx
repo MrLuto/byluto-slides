@@ -7,7 +7,7 @@
  * Render-only components (DataSlideRenderer / SlideStage) still receive
  * data via props — they remain store-agnostic.
  */
-import React, { useEffect } from 'react';
+import React from 'react';
 import { SlideStage } from '@/slides/runtime/SlideStage';
 import { mockDeck } from '@/editor/model/mockDeck';
 import { EditorSlide } from './EditorSlide';
@@ -21,17 +21,16 @@ import {
   useDeckActions,
   useZoom,
 } from '@/editor/state/deckStore';
+import { useDeckAutosave } from '@/editor/state/useDeckAutosave';
 
 export function MockDeckPreview() {
-  const { setDeck, setCurrentSlide, setZoom } = useDeckActions();
+  const { setCurrentSlide, setZoom } = useDeckActions();
   const deck = useCurrentDeck();
   const slide = useCurrentSlide();
   const zoom = useZoom();
-
-  // Load the mock deck once.
-  useEffect(() => {
-    setDeck(mockDeck);
-  }, [setDeck]);
+  // Autosave hydrates from localStorage on mount (with safeParseDeck) and
+  // debounces writes by 750ms — see useDeckAutosave.
+  const { status, reset } = useDeckAutosave(mockDeck);
 
   if (!deck || !slide) {
     return (
@@ -100,6 +99,32 @@ export function MockDeckPreview() {
           onClick={() => setZoom(zoom + 10)}
         >
           +
+        </button>
+
+        <span className="mx-2 h-4 w-px bg-border" />
+
+        <span
+          className={
+            'text-xs font-mono ' +
+            (status === 'error'
+              ? 'text-destructive'
+              : status === 'saving'
+              ? 'text-muted-foreground'
+              : 'text-green-600')
+          }
+        >
+          {status === 'saving'
+            ? 'Saving…'
+            : status === 'error'
+            ? 'Save error'
+            : 'Saved'}
+        </span>
+        <button
+          className="px-2 py-1 rounded border text-sm"
+          onClick={reset}
+          title="Reset to mock deck"
+        >
+          Reset
         </button>
       </div>
     </div>
