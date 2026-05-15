@@ -31,6 +31,8 @@ interface DeckState {
   selectedElementIds: ID[];
   zoom: number; // percent; 100 = fit
   editorMode: EditorMode;
+  /** Id of the element currently in inline text-edit mode, if any. */
+  editingTextId: ID | null;
 
   // actions
   setDeck: (deck: Deck | null) => void;
