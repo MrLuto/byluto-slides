@@ -1,50 +1,187 @@
 /**
- * SelectionLayer — read-only selection overlay (Phase 3B).
+ * SelectionLayer — selection + drag-to-move overlay (Phase 3C).
  *
  * Lives inside the same 1920×1080 coordinate space as `DataSlideRenderer`,
- * but is a separate sibling layer. Its job is purely:
+ * as a separate sibling layer. Responsibilities:
  *   - capture clicks on element bounding boxes → `selectElement`
  *   - capture clicks on empty slide space      → `clearSelection`
  *   - draw a selection outline on selected elements
+ *   - drag to move all currently-selected elements together
  *
- * It does NOT mutate elements (no drag, no resize, no text edit). The
- * renderer (`ElementRenderer`) uses `pointer-events: none`, so we mirror
+ * It does NOT mutate elements other than translating x/y (no resize, no
+ * text edit). `ElementRenderer` uses `pointer-events: none`, so we mirror
  * each element's bounding box here as a transparent hit target with
- * `pointer-events: auto`. Lines are skipped for now (their bbox can be
- * degenerate) — they'll get hit-testing in the drag/resize phase.
+ * `pointer-events: auto`. Lines are skipped for now — they'll get
+ * hit-testing/move support in a later phase.
+ *
+ * Coordinate conversion:
+ *   The slide is rendered through `SlideStage`, which applies a CSS scale
+ *   to fit a 1920×1080 surface inside the visible canvas. We read that
+ *   scale via `useSlideScale()` and divide pointer deltas (screen pixels)
+ *   by it to get canvas-space deltas. Example: at scale 0.5 the user moves
+ *   100 screen px → 200 slide-coordinate px.
+ *
+ * State updates:
+ *   We do NOT call `updateElement` on every `mousemove`. Instead we cache
+ *   the latest pointer event in a ref and flush a single batched update
+ *   per animation frame via `requestAnimationFrame`. The drag start
+ *   snapshot of element positions is held in a ref so we never read stale
+ *   x/y from the store mid-drag.
  */
-import React from 'react';
-import type { Slide, SlideElement } from '@/editor/model/types';
+import React, { useEffect, useRef } from 'react';
+import type { ID, Slide, SlideElement } from '@/editor/model/types';
 import {
   useSelectedElementIds,
   useDeckActions,
+  useDeckStore,
 } from '@/editor/state/deckStore';
+import { useSlideScale } from '@/slides/runtime/SlideStage';
 
 interface SelectionLayerProps {
   slide: Slide;
 }
 
+interface DragState {
+  pointerId: number;
+  startX: number; // screen px
+  startY: number; // screen px
+  // Snapshot of starting positions for every element being dragged.
+  // Keyed by element id, in slide coordinates.
+  origin: Map<ID, { x: number; y: number }>;
+  movedThisFrame: boolean;
+  rafId: number | null;
+  // Latest pointer position cached between frames.
+  lastClientX: number;
+  lastClientY: number;
+  // Set true on first move past a tiny threshold.
+  moved: boolean;
+}
+
+const DRAG_THRESHOLD_PX = 2;
+
 export function SelectionLayer({ slide }: SelectionLayerProps) {
   const selectedIds = useSelectedElementIds();
-  const { selectElement, clearSelection } = useDeckActions();
+  const { selectElement, clearSelection, updateElement } = useDeckActions();
+  const scale = useSlideScale();
 
-  const onBackgroundClick = (e: React.MouseEvent) => {
-    // Only clear when the click landed on the background itself, not on
-    // an element hit-target that bubbled up.
-    if (e.target === e.currentTarget) {
-      clearSelection();
+  // Refs that need to read current values without re-binding handlers.
+  const scaleRef = useRef(scale);
+  scaleRef.current = scale;
+  const slideIdRef = useRef(slide.id);
+  slideIdRef.current = slide.id;
+
+  const dragRef = useRef<DragState | null>(null);
+
+  // Cancel any in-flight rAF on unmount or slide change.
+  useEffect(() => {
+    return () => {
+      if (dragRef.current?.rafId != null) {
+        cancelAnimationFrame(dragRef.current.rafId);
+      }
+      dragRef.current = null;
+    };
+  }, [slide.id]);
+
+  const flushDrag = () => {
+    const drag = dragRef.current;
+    if (!drag) return;
+    drag.rafId = null;
+
+    const dxScreen = drag.lastClientX - drag.startX;
+    const dyScreen = drag.lastClientY - drag.startY;
+    const s = scaleRef.current || 1;
+    const dx = dxScreen / s;
+    const dy = dyScreen / s;
+
+    if (!drag.moved) {
+      if (Math.hypot(dxScreen, dyScreen) < DRAG_THRESHOLD_PX) return;
+      drag.moved = true;
     }
+
+    drag.origin.forEach((orig, id) => {
+      updateElement(slideIdRef.current, id, {
+        x: Math.round(orig.x + dx),
+        y: Math.round(orig.y + dy),
+      });
+    });
+  };
+
+  const onPointerMove = (e: PointerEvent) => {
+    const drag = dragRef.current;
+    if (!drag || e.pointerId !== drag.pointerId) return;
+    drag.lastClientX = e.clientX;
+    drag.lastClientY = e.clientY;
+    if (drag.rafId == null) {
+      drag.rafId = requestAnimationFrame(flushDrag);
+    }
+  };
+
+  const endDrag = (e: PointerEvent) => {
+    const drag = dragRef.current;
+    if (!drag || e.pointerId !== drag.pointerId) return;
+    if (drag.rafId != null) {
+      cancelAnimationFrame(drag.rafId);
+      // Final flush so the resting position is exact.
+      flushDrag();
+    }
+    window.removeEventListener('pointermove', onPointerMove);
+    window.removeEventListener('pointerup', endDrag);
+    window.removeEventListener('pointercancel', endDrag);
+    dragRef.current = null;
+  };
+
+  const beginDrag = (
+    pointerId: number,
+    clientX: number,
+    clientY: number,
+    targetIds: ID[],
+  ) => {
+    // Read the freshest deck snapshot directly from the store so we don't
+    // rely on a render having happened after the selection change.
+    const deck = useDeckStore.getState().currentDeck;
+    if (!deck) return;
+    const sl = deck.slides.find((x) => x.id === slideIdRef.current);
+    if (!sl) return;
+
+    const origin = new Map<ID, { x: number; y: number }>();
+    for (const id of targetIds) {
+      const el = sl.elements.find((e) => e.id === id);
+      if (!el) continue;
+      if (el.locked || el.hidden) continue;
+      if (el.type === 'line') continue; // lines unsupported for drag yet
+      origin.set(id, { x: el.x, y: el.y });
+    }
+    if (origin.size === 0) return;
+
+    dragRef.current = {
+      pointerId,
+      startX: clientX,
+      startY: clientY,
+      lastClientX: clientX,
+      lastClientY: clientY,
+      origin,
+      movedThisFrame: false,
+      rafId: null,
+      moved: false,
+    };
+    window.addEventListener('pointermove', onPointerMove);
+    window.addEventListener('pointerup', endDrag);
+    window.addEventListener('pointercancel', endDrag);
+  };
+
+  const onBackgroundPointerDown = (e: React.PointerEvent) => {
+    if (e.target !== e.currentTarget) return;
+    clearSelection();
   };
 
   return (
     <div
-      // Full slide area; catches "empty space" clicks.
       style={{
         position: 'absolute',
         inset: 0,
-        zIndex: 1_000_000, // above all rendered elements
+        zIndex: 1_000_000,
       }}
-      onMouseDown={onBackgroundClick}
+      onPointerDown={onBackgroundPointerDown}
     >
       {slide.elements.map((el) => {
         if (el.hidden || el.type === 'line') return null;
@@ -54,9 +191,40 @@ export function SelectionLayer({ slide }: SelectionLayerProps) {
             key={el.id}
             element={el}
             selected={isSelected}
-            onSelect={(additive) =>
-              selectElement(el.id, additive ? { additive: true } : undefined)
-            }
+            locked={!!el.locked}
+            onPointerDown={(e) => {
+              e.stopPropagation();
+              // Prevent native image/text drag.
+              e.preventDefault();
+
+              const additive = e.shiftKey;
+
+              // Compute the post-click selection so the drag operates on
+              // the correct id set (without waiting for a rerender).
+              let nextSelection: ID[];
+              if (additive) {
+                if (selectedIds.includes(el.id)) {
+                  nextSelection = selectedIds.filter((id) => id !== el.id);
+                } else {
+                  nextSelection = [...selectedIds, el.id];
+                }
+                selectElement(el.id, { additive: true });
+                // Shift-toggle: do not start a drag.
+                return;
+              }
+
+              if (selectedIds.includes(el.id)) {
+                // Already selected → drag the whole selection.
+                nextSelection = selectedIds;
+              } else {
+                // Replace selection with just this element, then drag it.
+                nextSelection = [el.id];
+                selectElement(el.id);
+              }
+
+              if (el.locked) return;
+              beginDrag(e.pointerId, e.clientX, e.clientY, nextSelection);
+            }}
           />
         );
       })}
@@ -67,19 +235,20 @@ export function SelectionLayer({ slide }: SelectionLayerProps) {
 interface ElementHitProps {
   element: Exclude<SlideElement, { type: 'line' }>;
   selected: boolean;
-  onSelect: (additive: boolean) => void;
+  locked: boolean;
+  onPointerDown: (e: React.PointerEvent<HTMLDivElement>) => void;
 }
 
-function ElementHit({ element, selected, onSelect }: ElementHitProps) {
+function ElementHit({ element, selected, locked, onPointerDown }: ElementHitProps) {
   return (
     <div
       data-element-id={element.id}
       data-selected={selected || undefined}
-      onMouseDown={(e) => {
-        // Stop background from clearing selection.
-        e.stopPropagation();
-        onSelect(e.shiftKey);
-      }}
+      data-locked={locked || undefined}
+      onPointerDown={onPointerDown}
+      // Suppress the browser's native drag-image for nested <img> targets.
+      onDragStart={(e) => e.preventDefault()}
+      draggable={false}
       style={{
         position: 'absolute',
         left: element.x,
@@ -91,12 +260,12 @@ function ElementHit({ element, selected, onSelect }: ElementHitProps) {
           : undefined,
         transformOrigin: 'center center',
         pointerEvents: 'auto',
-        cursor: 'pointer',
-        // Selection outline. Uses outline (not border) so it doesn't
-        // affect hit-box dimensions or layout.
+        cursor: locked ? 'not-allowed' : selected ? 'move' : 'pointer',
         outline: selected ? '2px solid hsl(217 91% 60%)' : 'none',
         outlineOffset: selected ? '2px' : 0,
         background: 'transparent',
+        userSelect: 'none',
+        touchAction: 'none',
       }}
     />
   );
