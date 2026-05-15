@@ -13,11 +13,25 @@ import { showcaseSlides } from '@/slides/showcase';
 
 interface SlideData {
   id: string;
+  /** Legacy name-derived id, used to recover presenter notes saved before stable IDs. */
+  legacyId: string;
   component: React.ComponentType<any>;
   name: string;
   isWIP: boolean;
   description?: string;
 }
+
+// Derive slides from showcaseSlides using the registry's stable id.
+// `legacyId` mirrors the previous name-based key so old presenter notes
+// can still be located and migrated.
+const slides: SlideData[] = showcaseSlides.map((s) => ({
+  id: s.id,
+  legacyId: `slide-${s.name.toLowerCase().replace(/\s+/g, '-')}`,
+  component: s.component,
+  name: s.name,
+  isWIP: false,
+  description: undefined,
+}));
 
 export default function Index() {
   const [activeSlideIndex, setActiveSlideIndex] = useState(0);
@@ -31,20 +45,9 @@ export default function Index() {
   const [sidebarWidth, setSidebarWidth] = useState(256);
   const [isResizing, setIsResizing] = useState(false);
   
-  // Derive slides from showcaseSlides with deterministic IDs (for presenter notes persistence)
-  const slides = React.useMemo<SlideData[]>(() => 
-    showcaseSlides.map((s) => ({
-      id: `slide-${s.name.toLowerCase().replace(/\s+/g, '-')}`,
-      component: s.component,
-      name: s.name,
-      isWIP: false,
-      description: undefined,
-    })),
-    []
-  );
-
-  // Get current slide ID for presenter notes
+  // Stable id + legacy fallback for presenter notes lookup.
   const currentSlideId = slides[activeSlideIndex]?.id ?? null;
+  const currentLegacySlideId = slides[activeSlideIndex]?.legacyId ?? null;
 
   // Toggle dark mode
   useEffect(() => {
@@ -190,6 +193,7 @@ export default function Index() {
           {showNotes && (
             <PresenterNotesPanel
               slideId={currentSlideId}
+              legacySlideId={currentLegacySlideId}
               slideIndex={activeSlideIndex}
               onClose={() => setShowNotes(false)}
             />
