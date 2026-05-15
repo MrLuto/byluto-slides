@@ -133,6 +133,52 @@ export const useDeckStore = create<DeckState>((set) => ({
       if (!mutated) return {};
       return { currentDeck: { ...deck, slides } };
     }),
+
+  addElement: (slideId, element) =>
+    set((s) => {
+      const deck = s.currentDeck;
+      if (!deck) return {};
+      let inserted = false;
+      const slides = deck.slides.map((sl) => {
+        if (sl.id !== slideId) return sl;
+        const maxZ = sl.elements.reduce((m, e) => Math.max(m, e.z ?? 0), 0);
+        const withZ = { ...element, z: maxZ + 1 } as SlideElement;
+        inserted = true;
+        return { ...sl, elements: [...sl.elements, withZ] };
+      });
+      if (!inserted) return {};
+      return {
+        currentDeck: { ...deck, slides },
+        selectedElementIds: [element.id],
+        editingTextId: null,
+      };
+    }),
+
+  deleteSelectedElements: () =>
+    set((s) => {
+      const deck = s.currentDeck;
+      const slideId = s.currentSlideId;
+      if (!deck || !slideId) return {};
+      const ids = new Set(s.selectedElementIds);
+      if (ids.size === 0) return {};
+      let mutated = false;
+      const slides = deck.slides.map((sl) => {
+        if (sl.id !== slideId) return sl;
+        const next = sl.elements.filter((el) => {
+          if (!ids.has(el.id)) return true;
+          if (el.locked) return true; // skip locked
+          mutated = true;
+          return false;
+        });
+        return { ...sl, elements: next };
+      });
+      if (!mutated) return { selectedElementIds: [], editingTextId: null };
+      return {
+        currentDeck: { ...deck, slides },
+        selectedElementIds: [],
+        editingTextId: null,
+      };
+    }),
 }));
 
 // ──────────────────────────────────────────────────────────────────────────
