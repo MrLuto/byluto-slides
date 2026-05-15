@@ -11,13 +11,13 @@ export interface PresenterNote {
 
 const DEBOUNCE_MS = 500;
 
-export function usePresenterNotes(slideId: string | null) {
+export function usePresenterNotes(slideId: string | null, legacySlideId?: string | null) {
   const [note, setNote] = useState<PresenterNote | null>(null);
   const [content, setContent] = useState('');
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
-  
+
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
   const pendingContentRef = useRef<string | null>(null);
   const noteIdRef = useRef<string | null>(null);
@@ -31,13 +31,40 @@ export function usePresenterNotes(slideId: string | null) {
 
     try {
       setLoading(true);
-      const { data, error } = await supabase
+
+      // 1) Try the stable id first.
+      let { data, error } = await supabase
         .from('presenter_notes')
         .select('*')
         .eq('slide_id', slideId)
         .maybeSingle();
 
       if (error) throw error;
+
+      // 2) If nothing found and a legacy id was provided, look it up and
+      //    migrate the row's slide_id to the new stable id so future loads
+      //    hit the fast path. This is a one-time, per-slide rewrite.
+      if (!data && legacySlideId && legacySlideId !== slideId) {
+        const legacy = await supabase
+          .from('presenter_notes')
+          .select('*')
+          .eq('slide_id', legacySlideId)
+          .maybeSingle();
+
+        if (legacy.error) throw legacy.error;
+
+        if (legacy.data) {
+          const migrated = await supabase
+            .from('presenter_notes')
+            .update({ slide_id: slideId })
+            .eq('id', legacy.data.id)
+            .select()
+            .single();
+
+          if (migrated.error) throw migrated.error;
+          data = migrated.data;
+        }
+      }
 
       if (data) {
         const fetchedNote = {
@@ -60,7 +87,7 @@ export function usePresenterNotes(slideId: string | null) {
     } finally {
       setLoading(false);
     }
-  }, [slideId]);
+  }, [slideId, legacySlideId]);
 
   useEffect(() => {
     fetchNote();
