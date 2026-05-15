@@ -398,7 +398,10 @@ export function SelectionLayer({ slide }: SelectionLayerProps) {
   const onBackgroundPointerDown = (e: React.PointerEvent) => {
     if (e.target !== e.currentTarget) return;
     // Clicking outside also exits inline text-edit mode.
-    if (editingTextId != null) setEditingText(null);
+    if (editingTextId != null) {
+      setEditingText(null);
+      endHistory();
+    }
     clearSelection();
   };
 
