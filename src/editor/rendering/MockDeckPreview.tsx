@@ -35,14 +35,17 @@ import {
   useDeckActions,
   useZoom,
 } from '@/editor/state/deckStore';
-import { useDeckAutosave } from '@/editor/state/useDeckAutosave';
+import { useDeckPersistence } from '@/editor/state/useDeckPersistence';
 
-export function MockDeckPreview() {
+export function MockDeckPreview({ deckId }: { deckId?: string } = {}) {
   const { setCurrentSlide, setZoom } = useDeckActions();
   const deck = useCurrentDeck();
   const slide = useCurrentSlide();
   const zoom = useZoom();
-  const { status, reset } = useDeckAutosave(mockDeck);
+  const { status, mode, title, setTitle, reset } = useDeckPersistence({
+    deckId,
+    fallbackDeck: mockDeck,
+  });
 
   if (!deck || !slide) {
     return (
