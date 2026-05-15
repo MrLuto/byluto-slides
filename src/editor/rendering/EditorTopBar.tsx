@@ -68,6 +68,7 @@ export function EditorTopBar() {
   } = useDeckActions();
 
   const fileRef = useRef<HTMLInputElement>(null);
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [msg, setMsg] = useState<{ kind: 'ok' | 'err'; text: string } | null>(
     null,
   );
