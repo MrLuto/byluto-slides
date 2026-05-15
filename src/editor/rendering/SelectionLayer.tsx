@@ -126,6 +126,9 @@ export function SelectionLayer({ slide }: SelectionLayerProps) {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       if (isEditableTarget(e.target)) return;
+      // Belt-and-suspenders: even if focus has slipped, never nudge while
+      // an inline text editor is active.
+      if (useDeckStore.getState().editingTextId != null) return;
 
       let dx = 0;
       let dy = 0;
