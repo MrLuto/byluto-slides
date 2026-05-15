@@ -53,7 +53,15 @@ const PLACEHOLDER_IMAGE_SRC =
     </svg>`,
   );
 
-export function EditorTopBar() {
+export interface EditorTopBarProps {
+  /** Editable deck title shown next to the brand. Falls back to deck.title. */
+  title?: string;
+  onTitleChange?: (next: string) => void;
+  /** Persistence indicator shown in the brand chip. */
+  mode?: 'cloud' | 'local';
+}
+
+export function EditorTopBar({ title, onTitleChange, mode }: EditorTopBarProps = {}) {
   const slideId = useCurrentSlideId();
   const deck = useCurrentDeck();
   const selected = useSelectedElementIds();
