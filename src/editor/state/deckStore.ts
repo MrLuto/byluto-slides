@@ -17,7 +17,7 @@
  */
 import { create } from 'zustand';
 import { useShallow } from 'zustand/react/shallow';
-import type { Deck, ID, Slide } from '@/editor/model/types';
+import type { Deck, ID, Slide, SlideElement } from '@/editor/model/types';
 
 export type EditorMode = 'edit' | 'preview';
 
