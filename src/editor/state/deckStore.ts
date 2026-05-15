@@ -69,6 +69,7 @@ export const useDeckStore = create<DeckState>((set) => ({
       // When the deck changes, default to its first slide and clear selection.
       currentSlideId: deck?.slides[0]?.id ?? null,
       selectedElementIds: [],
+      editingTextId: null,
     })),
 
   setCurrentSlide: (slideId) =>
@@ -76,6 +77,7 @@ export const useDeckStore = create<DeckState>((set) => ({
       currentSlideId: slideId,
       // Selection is per-slide; clear when navigating between slides.
       selectedElementIds: [],
+      editingTextId: null,
     })),
 
   selectElement: (elementId, opts) =>
