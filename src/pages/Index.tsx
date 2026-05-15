@@ -193,6 +193,7 @@ export default function Index() {
           {showNotes && (
             <PresenterNotesPanel
               slideId={currentSlideId}
+              legacySlideId={currentLegacySlideId}
               slideIndex={activeSlideIndex}
               onClose={() => setShowNotes(false)}
             />
