@@ -426,6 +426,26 @@ export function SelectionLayer({ slide }: SelectionLayerProps) {
           />
         );
       })}
+
+      {/* Resize handles: only when exactly one resizable element is selected. */}
+      {(() => {
+        if (selectedIds.length !== 1) return null;
+        const el = slide.elements.find((e) => e.id === selectedIds[0]);
+        if (!el) return null;
+        if (el.hidden || el.locked) return null;
+        if (el.type === 'line') return null;
+        return (
+          <ResizeHandles
+            element={el}
+            scale={scale}
+            onCornerPointerDown={(corner, e) => {
+              e.stopPropagation();
+              e.preventDefault();
+              beginResize(e.pointerId, e.clientX, e.clientY, el.id, corner);
+            }}
+          />
+        );
+      })()}
     </div>
   );
 }
