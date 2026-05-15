@@ -22,6 +22,26 @@ import type { Deck, ID, Slide, SlideElement } from '@/editor/model/types';
 export type EditorMode = 'edit' | 'preview';
 
 // ──────────────────────────────────────────────────────────────────────────
+// History
+//
+// Snapshot-based undo/redo. We push the *previous* `currentDeck` reference
+// into `past` whenever a deck-mutating action runs, and clear `future`. On
+// undo we move the head of `past` back into `currentDeck` and push the
+// current one onto `future`. UI-only state — selection, zoom, editor mode,
+// inline text-edit id — is intentionally not snapshotted: it would create
+// noisy entries (e.g. "I clicked an element") and round-trip badly when a
+// snapshot points at slides/elements that no longer exist.
+//
+// To avoid one history entry per drag/resize frame, callers wrap a gesture
+// in `beginHistory()` / `endHistory()`. While `_txDepth > 0`, mutations
+// update `currentDeck` but do NOT push to `past`; on `endHistory` we push
+// the snapshot captured at the *start* of the gesture — yielding one
+// reversible step for the whole drag/resize/typing burst.
+// ──────────────────────────────────────────────────────────────────────────
+
+const HISTORY_LIMIT = 100;
+
+// ──────────────────────────────────────────────────────────────────────────
 // State + actions
 // ──────────────────────────────────────────────────────────────────────────
 
@@ -33,6 +53,14 @@ interface DeckState {
   editorMode: EditorMode;
   /** Id of the element currently in inline text-edit mode, if any. */
   editingTextId: ID | null;
+
+  // history (deck snapshots only — UI state is excluded by design)
+  past: Deck[];
+  future: Deck[];
+  /** Internal: nesting depth of an open history transaction. */
+  _txDepth: number;
+  /** Internal: deck snapshot captured at the start of the transaction. */
+  _txPre: Deck | null;
 
   // actions
   setDeck: (deck: Deck | null) => void;
@@ -65,21 +93,36 @@ interface DeckState {
   deleteSelectedElements: () => void;
   /** Append a new blank slide and select it. */
   addSlide: () => void;
-  /**
-   * Duplicate the current slide. The new slide gets a fresh ID and every
-   * element inside it is rewritten with a fresh ID too — we walk the
-   * element list and replace `el.id` via `crypto.randomUUID()` so nothing
-   * collides with the original. The duplicate is inserted right after the
-   * source and selected.
-   */
   duplicateCurrentSlide: () => void;
-  /**
-   * Remove the current slide. No-ops if only one slide remains. After
-   * removal, selects the slide at the same index (or the new last slide).
-   */
   deleteCurrentSlide: () => void;
-  /** Reorder a slide. Indices are clamped; positions are renumbered. */
   moveSlide: (fromIndex: number, toIndex: number) => void;
+
+  // history actions
+  /** Open a history transaction; nest-safe. Pair with `endHistory`. */
+  beginHistory: () => void;
+  /** Close a history transaction; commits one entry on the outermost call. */
+  endHistory: () => void;
+  undo: () => void;
+  redo: () => void;
+}
+
+/**
+ * Compute the state patch for a deck-changing action. Records history
+ * unless we're inside an open transaction (in which case the snapshot was
+ * already captured at `beginHistory` time).
+ */
+function withHistory(
+  s: DeckState,
+  nextDeck: Deck,
+  extra: Partial<DeckState> = {},
+): Partial<DeckState> {
+  if (nextDeck === s.currentDeck) return extra;
+  if (s._txDepth > 0 || !s.currentDeck) {
+    return { currentDeck: nextDeck, ...extra };
+  }
+  const past = [...s.past, s.currentDeck];
+  if (past.length > HISTORY_LIMIT) past.splice(0, past.length - HISTORY_LIMIT);
+  return { currentDeck: nextDeck, past, future: [], ...extra };
 }
 
 export const useDeckStore = create<DeckState>((set) => ({
