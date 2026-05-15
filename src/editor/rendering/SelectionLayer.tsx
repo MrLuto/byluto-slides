@@ -506,6 +506,7 @@ function ElementHit({ element, selected, locked, onPointerDown, onDoubleClick }:
       data-selected={selected || undefined}
       data-locked={locked || undefined}
       onPointerDown={onPointerDown}
+      onDoubleClick={onDoubleClick}
       // Suppress the browser's native drag-image for nested <img> targets.
       onDragStart={(e) => e.preventDefault()}
       draggable={false}
