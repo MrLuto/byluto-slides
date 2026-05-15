@@ -83,6 +83,23 @@ export function InsertToolbar() {
       >
         Delete selected
       </button>
+      <span className="mx-2 h-4 w-px bg-border" />
+      <button
+        className={btn}
+        onClick={undo}
+        disabled={!canUndo}
+        title="Undo (⌘Z)"
+      >
+        Undo
+      </button>
+      <button
+        className={btn}
+        onClick={redo}
+        disabled={!canRedo}
+        title="Redo (⌘⇧Z)"
+      >
+        Redo
+      </button>
     </div>
   );
 }
