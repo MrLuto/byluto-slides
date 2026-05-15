@@ -6,6 +6,8 @@ import { usePresenterNotes } from '@/hooks/usePresenterNotes';
 
 interface PresenterNotesPanelProps {
   slideId: string | null;
+  /** Optional legacy id used to recover notes saved before stable IDs. */
+  legacySlideId?: string | null;
   slideIndex: number;
   onClose: () => void;
   className?: string;
@@ -13,11 +15,12 @@ interface PresenterNotesPanelProps {
 
 export function PresenterNotesPanel({
   slideId,
+  legacySlideId,
   slideIndex,
   onClose,
   className,
 }: PresenterNotesPanelProps) {
-  const { content, loading, saveStatus, updateContent } = usePresenterNotes(slideId);
+  const { content, loading, saveStatus, updateContent } = usePresenterNotes(slideId, legacySlideId);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
