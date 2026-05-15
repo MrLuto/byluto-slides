@@ -359,6 +359,7 @@ export function SelectionLayer({ slide }: SelectionLayerProps) {
     window.removeEventListener('pointerup', endResize);
     window.removeEventListener('pointercancel', endResize);
     resizeRef.current = null;
+    endHistory();
   };
 
   const beginResize = (
