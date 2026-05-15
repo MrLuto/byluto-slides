@@ -392,16 +392,46 @@ export function SelectionLayer({ slide }: SelectionLayerProps) {
       {slide.elements.map((el) => {
         if (el.hidden || el.type === 'line') return null;
         const isSelected = selectedIds.includes(el.id);
+
+        // While this text element is being inline-edited, replace its hit
+        // target with the textarea overlay. This disables drag/resize for
+        // it and gives the editor full pointer/keyboard focus.
+        if (el.type === 'text' && editingTextId === el.id) {
+          return (
+            <TextEditOverlay
+              key={el.id}
+              element={el}
+              onChange={(text) =>
+                updateElement(slideIdRef.current, el.id, { text })
+              }
+              onExit={() => setEditingText(null)}
+            />
+          );
+        }
+
         return (
           <ElementHit
             key={el.id}
             element={el}
             selected={isSelected}
             locked={!!el.locked}
+            onDoubleClick={
+              el.type === 'text' && !el.locked
+                ? () => {
+                    selectElement(el.id);
+                    setEditingText(el.id);
+                  }
+                : undefined
+            }
             onPointerDown={(e) => {
               e.stopPropagation();
               // Prevent native image/text drag.
               e.preventDefault();
+
+              // Any pointerdown elsewhere exits inline text edit.
+              if (editingTextId != null && editingTextId !== el.id) {
+                setEditingText(null);
+              }
 
               const additive = e.shiftKey;
 
