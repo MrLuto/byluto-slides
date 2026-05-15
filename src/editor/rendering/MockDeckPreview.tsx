@@ -100,6 +100,32 @@ export function MockDeckPreview() {
         >
           +
         </button>
+
+        <span className="mx-2 h-4 w-px bg-border" />
+
+        <span
+          className={
+            'text-xs font-mono ' +
+            (status === 'error'
+              ? 'text-destructive'
+              : status === 'saving'
+              ? 'text-muted-foreground'
+              : 'text-green-600')
+          }
+        >
+          {status === 'saving'
+            ? 'Saving…'
+            : status === 'error'
+            ? 'Save error'
+            : 'Saved'}
+        </span>
+        <button
+          className="px-2 py-1 rounded border text-sm"
+          onClick={reset}
+          title="Reset to mock deck"
+        >
+          Reset
+        </button>
       </div>
     </div>
   );
