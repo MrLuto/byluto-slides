@@ -198,6 +198,16 @@ export const useDeckStore = create<DeckState>((set) => ({
     }),
 }));
 
+// Local helper for slide actions — keeps `defaults.ts` import out of the
+// module top-level type cycle and lets us regenerate ids without pulling in
+// the whole factory layer.
+const newId = (): ID => {
+  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+    return crypto.randomUUID();
+  }
+  return 'id-' + Math.random().toString(36).slice(2) + Date.now().toString(36);
+};
+
 // ──────────────────────────────────────────────────────────────────────────
 // Granular selector hooks
 //
