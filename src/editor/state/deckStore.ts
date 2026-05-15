@@ -338,5 +338,9 @@ export const useDeckActions = () =>
       setEditingText: s.setEditingText,
       addElement: s.addElement,
       deleteSelectedElements: s.deleteSelectedElements,
+      addSlide: s.addSlide,
+      duplicateCurrentSlide: s.duplicateCurrentSlide,
+      deleteCurrentSlide: s.deleteCurrentSlide,
+      moveSlide: s.moveSlide,
     })),
   );
