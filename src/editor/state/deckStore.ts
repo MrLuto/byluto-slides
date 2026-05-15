@@ -31,6 +31,8 @@ interface DeckState {
   selectedElementIds: ID[];
   zoom: number; // percent; 100 = fit
   editorMode: EditorMode;
+  /** Id of the element currently in inline text-edit mode, if any. */
+  editingTextId: ID | null;
 
   // actions
   setDeck: (deck: Deck | null) => void;
@@ -39,6 +41,8 @@ interface DeckState {
   clearSelection: () => void;
   setZoom: (zoom: number) => void;
   setEditorMode: (mode: EditorMode) => void;
+  /** Enter/exit inline text-edit mode. Pass `null` to exit. */
+  setEditingText: (elementId: ID | null) => void;
   /**
    * Patch a single element on a slide. Pass any subset of element fields
    * (e.g. `{ x, y }` during a drag). No-ops if the slide or element is
@@ -57,6 +61,7 @@ export const useDeckStore = create<DeckState>((set) => ({
   selectedElementIds: [],
   zoom: 100,
   editorMode: 'edit',
+  editingTextId: null,
 
   setDeck: (deck) =>
     set(() => ({
@@ -64,6 +69,7 @@ export const useDeckStore = create<DeckState>((set) => ({
       // When the deck changes, default to its first slide and clear selection.
       currentSlideId: deck?.slides[0]?.id ?? null,
       selectedElementIds: [],
+      editingTextId: null,
     })),
 
   setCurrentSlide: (slideId) =>
@@ -71,6 +77,7 @@ export const useDeckStore = create<DeckState>((set) => ({
       currentSlideId: slideId,
       // Selection is per-slide; clear when navigating between slides.
       selectedElementIds: [],
+      editingTextId: null,
     })),
 
   selectElement: (elementId, opts) =>
@@ -94,6 +101,8 @@ export const useDeckStore = create<DeckState>((set) => ({
     set(() => ({ zoom: Math.max(10, Math.min(400, Math.round(zoom))) })),
 
   setEditorMode: (editorMode) => set(() => ({ editorMode })),
+
+  setEditingText: (editingTextId) => set(() => ({ editingTextId })),
 
   updateElement: (slideId, elementId, patch) =>
     set((s) => {
@@ -128,6 +137,7 @@ export const useCurrentDeck = () => useDeckStore((s) => s.currentDeck);
 export const useCurrentSlideId = () => useDeckStore((s) => s.currentSlideId);
 export const useZoom = () => useDeckStore((s) => s.zoom);
 export const useEditorMode = () => useDeckStore((s) => s.editorMode);
+export const useEditingTextId = () => useDeckStore((s) => s.editingTextId);
 
 /** Selected element ids as a stable array reference (shallow-compared). */
 export const useSelectedElementIds = () =>
@@ -158,5 +168,6 @@ export const useDeckActions = () =>
       setZoom: s.setZoom,
       setEditorMode: s.setEditorMode,
       updateElement: s.updateElement,
+      setEditingText: s.setEditingText,
     })),
   );

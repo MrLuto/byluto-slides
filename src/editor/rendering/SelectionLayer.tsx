@@ -36,6 +36,7 @@ import {
   useSelectedElementIds,
   useDeckActions,
   useDeckStore,
+  useEditingTextId,
 } from '@/editor/state/deckStore';
 import { useSlideScale } from '@/slides/runtime/SlideStage';
 
@@ -78,7 +79,9 @@ interface ResizeState {
 
 export function SelectionLayer({ slide }: SelectionLayerProps) {
   const selectedIds = useSelectedElementIds();
-  const { selectElement, clearSelection, updateElement } = useDeckActions();
+  const { selectElement, clearSelection, updateElement, setEditingText } =
+    useDeckActions();
+  const editingTextId = useEditingTextId();
   const scale = useSlideScale();
 
   // Refs that need to read current values without re-binding handlers.
@@ -123,6 +126,9 @@ export function SelectionLayer({ slide }: SelectionLayerProps) {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       if (isEditableTarget(e.target)) return;
+      // Belt-and-suspenders: even if focus has slipped, never nudge while
+      // an inline text editor is active.
+      if (useDeckStore.getState().editingTextId != null) return;
 
       let dx = 0;
       let dy = 0;
@@ -369,6 +375,8 @@ export function SelectionLayer({ slide }: SelectionLayerProps) {
 
   const onBackgroundPointerDown = (e: React.PointerEvent) => {
     if (e.target !== e.currentTarget) return;
+    // Clicking outside also exits inline text-edit mode.
+    if (editingTextId != null) setEditingText(null);
     clearSelection();
   };
 
@@ -384,16 +392,46 @@ export function SelectionLayer({ slide }: SelectionLayerProps) {
       {slide.elements.map((el) => {
         if (el.hidden || el.type === 'line') return null;
         const isSelected = selectedIds.includes(el.id);
+
+        // While this text element is being inline-edited, replace its hit
+        // target with the textarea overlay. This disables drag/resize for
+        // it and gives the editor full pointer/keyboard focus.
+        if (el.type === 'text' && editingTextId === el.id) {
+          return (
+            <TextEditOverlay
+              key={el.id}
+              element={el}
+              onChange={(text) =>
+                updateElement(slideIdRef.current, el.id, { text })
+              }
+              onExit={() => setEditingText(null)}
+            />
+          );
+        }
+
         return (
           <ElementHit
             key={el.id}
             element={el}
             selected={isSelected}
             locked={!!el.locked}
+            onDoubleClick={
+              el.type === 'text' && !el.locked
+                ? () => {
+                    selectElement(el.id);
+                    setEditingText(el.id);
+                  }
+                : undefined
+            }
             onPointerDown={(e) => {
               e.stopPropagation();
               // Prevent native image/text drag.
               e.preventDefault();
+
+              // Any pointerdown elsewhere exits inline text edit.
+              if (editingTextId != null && editingTextId !== el.id) {
+                setEditingText(null);
+              }
 
               const additive = e.shiftKey;
 
@@ -427,11 +465,14 @@ export function SelectionLayer({ slide }: SelectionLayerProps) {
         );
       })}
 
-      {/* Resize handles: only when exactly one resizable element is selected. */}
+      {/* Resize handles: only when exactly one resizable element is selected
+          and we're not in inline text-edit mode. */}
       {(() => {
         if (selectedIds.length !== 1) return null;
+        if (editingTextId != null) return null;
         const el = slide.elements.find((e) => e.id === selectedIds[0]);
         if (!el) return null;
+        if (el.hidden || el.locked) return null;
         if (el.hidden || el.locked) return null;
         if (el.type === 'line') return null;
         return (
@@ -455,15 +496,17 @@ interface ElementHitProps {
   selected: boolean;
   locked: boolean;
   onPointerDown: (e: React.PointerEvent<HTMLDivElement>) => void;
+  onDoubleClick?: () => void;
 }
 
-function ElementHit({ element, selected, locked, onPointerDown }: ElementHitProps) {
+function ElementHit({ element, selected, locked, onPointerDown, onDoubleClick }: ElementHitProps) {
   return (
     <div
       data-element-id={element.id}
       data-selected={selected || undefined}
       data-locked={locked || undefined}
       onPointerDown={onPointerDown}
+      onDoubleClick={onDoubleClick}
       // Suppress the browser's native drag-image for nested <img> targets.
       onDragStart={(e) => e.preventDefault()}
       draggable={false}
@@ -543,5 +586,93 @@ function ResizeHandles({ element, scale, onCornerPointerDown }: ResizeHandlesPro
         />
       ))}
     </>
+  );
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// Inline text editing
+//
+// A textarea positioned in slide coordinates over the text element. Styles
+// mirror the rendered text (font family/size/weight/color/align/line-height)
+// so the caret aligns with what the renderer draws underneath. Updates are
+// committed to TextElement.text on every change. Exit on Escape, blur, or
+// pointerdown elsewhere (handled by SelectionLayer's background handler).
+// Note: keyboard nudging is suppressed both by the standard editable-target
+// guard (TEXTAREA) and an explicit `editingTextId != null` short-circuit.
+// ──────────────────────────────────────────────────────────────────────────
+
+interface TextEditOverlayProps {
+  element: import('@/editor/model/types').TextElement;
+  onChange: (text: string) => void;
+  onExit: () => void;
+}
+
+function TextEditOverlay({ element, onChange, onExit }: TextEditOverlayProps) {
+  const ref = React.useRef<HTMLTextAreaElement>(null);
+  React.useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.focus();
+    // Place caret at the end on entry.
+    const len = el.value.length;
+    el.setSelectionRange(len, len);
+  }, []);
+
+  const ts = element.textStyle ?? {};
+
+  return (
+    <textarea
+      ref={ref}
+      value={element.text}
+      onChange={(e) => onChange(e.target.value)}
+      onKeyDown={(e) => {
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          e.stopPropagation();
+          onExit();
+        }
+        // Stop arrows / Backspace / Delete from bubbling up to the
+        // SelectionLayer's window-level handler.
+        e.stopPropagation();
+      }}
+      onPointerDown={(e) => e.stopPropagation()}
+      onBlur={onExit}
+      spellCheck={false}
+      style={{
+        position: 'absolute',
+        left: element.x,
+        top: element.y,
+        width: element.width,
+        height: element.height,
+        transform: element.rotation
+          ? `rotate(${element.rotation}deg)`
+          : undefined,
+        transformOrigin: 'center center',
+        pointerEvents: 'auto',
+        // Match the rendered text styling so the caret aligns with the
+        // underlying preview while typing.
+        fontFamily: ts.fontFamily,
+        fontSize: ts.fontSize,
+        fontWeight: ts.fontWeight,
+        fontStyle: ts.italic ? 'italic' : undefined,
+        color: ts.color,
+        lineHeight: ts.lineHeight,
+        letterSpacing: ts.letterSpacing,
+        textAlign: ts.align,
+        whiteSpace: 'pre-wrap',
+        wordBreak: 'break-word',
+        // Editor chrome: keep selection indication, kill native textarea
+        // chrome so it overlays the rendered text cleanly.
+        background: 'transparent',
+        border: 'none',
+        outline: '2px dashed hsl(217 91% 60%)',
+        outlineOffset: '2px',
+        padding: 0,
+        margin: 0,
+        resize: 'none',
+        overflow: 'hidden',
+        boxSizing: 'border-box',
+      }}
+    />
   );
 }
