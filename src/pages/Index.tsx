@@ -13,11 +13,25 @@ import { showcaseSlides } from '@/slides/showcase';
 
 interface SlideData {
   id: string;
+  /** Legacy name-derived id, used to recover presenter notes saved before stable IDs. */
+  legacyId: string;
   component: React.ComponentType<any>;
   name: string;
   isWIP: boolean;
   description?: string;
 }
+
+// Derive slides from showcaseSlides using the registry's stable id.
+// `legacyId` mirrors the previous name-based key so old presenter notes
+// can still be located and migrated.
+const slides: SlideData[] = showcaseSlides.map((s) => ({
+  id: s.id,
+  legacyId: `slide-${s.name.toLowerCase().replace(/\s+/g, '-')}`,
+  component: s.component,
+  name: s.name,
+  isWIP: false,
+  description: undefined,
+}));
 
 export default function Index() {
   const [activeSlideIndex, setActiveSlideIndex] = useState(0);
