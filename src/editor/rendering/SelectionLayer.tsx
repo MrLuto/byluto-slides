@@ -79,8 +79,14 @@ interface ResizeState {
 
 export function SelectionLayer({ slide }: SelectionLayerProps) {
   const selectedIds = useSelectedElementIds();
-  const { selectElement, clearSelection, updateElement, setEditingText } =
-    useDeckActions();
+  const {
+    selectElement,
+    clearSelection,
+    updateElement,
+    setEditingText,
+    beginHistory,
+    endHistory,
+  } = useDeckActions();
   const editingTextId = useEditingTextId();
   const scale = useSlideScale();
 
@@ -124,6 +130,22 @@ export function SelectionLayer({ slide }: SelectionLayerProps) {
     };
 
     const onKeyDown = (e: KeyboardEvent) => {
+      // Undo / redo work even when typing in form inputs of the editor
+      // chrome (toolbar, inspector). They do NOT trigger inside the inline
+      // text editor — the textarea's own keydown stops propagation first.
+      const mod = e.metaKey || e.ctrlKey;
+      if (mod && (e.key === 'z' || e.key === 'Z')) {
+        e.preventDefault();
+        if (e.shiftKey) useDeckStore.getState().redo();
+        else useDeckStore.getState().undo();
+        return;
+      }
+      if (mod && (e.key === 'y' || e.key === 'Y')) {
+        e.preventDefault();
+        useDeckStore.getState().redo();
+        return;
+      }
+
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       if (isEditableTarget(e.target)) return;
       // Belt-and-suspenders: even if focus has slipped, never nudge while
@@ -224,6 +246,8 @@ export function SelectionLayer({ slide }: SelectionLayerProps) {
     window.removeEventListener('pointerup', endDrag);
     window.removeEventListener('pointercancel', endDrag);
     dragRef.current = null;
+    // Commit one history entry for the entire drag gesture.
+    endHistory();
   };
 
   const beginDrag = (
@@ -263,6 +287,8 @@ export function SelectionLayer({ slide }: SelectionLayerProps) {
     window.addEventListener('pointermove', onPointerMove);
     window.addEventListener('pointerup', endDrag);
     window.addEventListener('pointercancel', endDrag);
+    // Open one history transaction for the full drag.
+    beginHistory();
   };
 
   // ── Resize ────────────────────────────────────────────────────────────
@@ -349,6 +375,7 @@ export function SelectionLayer({ slide }: SelectionLayerProps) {
     window.removeEventListener('pointerup', endResize);
     window.removeEventListener('pointercancel', endResize);
     resizeRef.current = null;
+    endHistory();
   };
 
   const beginResize = (
@@ -381,12 +408,16 @@ export function SelectionLayer({ slide }: SelectionLayerProps) {
     window.addEventListener('pointermove', onResizePointerMove);
     window.addEventListener('pointerup', endResize);
     window.addEventListener('pointercancel', endResize);
+    beginHistory();
   };
 
   const onBackgroundPointerDown = (e: React.PointerEvent) => {
     if (e.target !== e.currentTarget) return;
     // Clicking outside also exits inline text-edit mode.
-    if (editingTextId != null) setEditingText(null);
+    if (editingTextId != null) {
+      setEditingText(null);
+      endHistory();
+    }
     clearSelection();
   };
 
@@ -414,7 +445,10 @@ export function SelectionLayer({ slide }: SelectionLayerProps) {
               onChange={(text) =>
                 updateElement(slideIdRef.current, el.id, { text })
               }
-              onExit={() => setEditingText(null)}
+              onExit={() => {
+                setEditingText(null);
+                endHistory();
+              }}
             />
           );
         }
@@ -429,6 +463,8 @@ export function SelectionLayer({ slide }: SelectionLayerProps) {
               el.type === 'text' && !el.locked
                 ? () => {
                     selectElement(el.id);
+                    // Group all keystrokes during this edit into one entry.
+                    beginHistory();
                     setEditingText(el.id);
                   }
                 : undefined
@@ -441,6 +477,7 @@ export function SelectionLayer({ slide }: SelectionLayerProps) {
               // Any pointerdown elsewhere exits inline text edit.
               if (editingTextId != null && editingTextId !== el.id) {
                 setEditingText(null);
+                endHistory();
               }
 
               const additive = e.shiftKey;

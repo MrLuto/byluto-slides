@@ -20,6 +20,8 @@ import {
   createImageElement,
 } from '@/editor/model/defaults';
 import {
+  useCanRedo,
+  useCanUndo,
   useCurrentSlideId,
   useDeckActions,
   useSelectedElementIds,
@@ -40,7 +42,9 @@ const PLACEHOLDER_IMAGE_SRC =
 export function InsertToolbar() {
   const slideId = useCurrentSlideId();
   const selected = useSelectedElementIds();
-  const { addElement, deleteSelectedElements } = useDeckActions();
+  const canUndo = useCanUndo();
+  const canRedo = useCanRedo();
+  const { addElement, deleteSelectedElements, undo, redo } = useDeckActions();
 
   if (!slideId) return null;
 
@@ -78,6 +82,23 @@ export function InsertToolbar() {
         disabled={selected.length === 0}
       >
         Delete selected
+      </button>
+      <span className="mx-2 h-4 w-px bg-border" />
+      <button
+        className={btn}
+        onClick={undo}
+        disabled={!canUndo}
+        title="Undo (⌘Z)"
+      >
+        Undo
+      </button>
+      <button
+        className={btn}
+        onClick={redo}
+        disabled={!canRedo}
+        title="Redo (⌘⇧Z)"
+      >
+        Redo
       </button>
     </div>
   );
