@@ -17,6 +17,7 @@ import {
   Copy,
   Download,
   Image as ImageIcon,
+  Keyboard,
   Redo2,
   Square,
   Circle as CircleIcon,
@@ -25,6 +26,7 @@ import {
   Undo2,
   Upload,
 } from 'lucide-react';
+import { ShortcutsDialog } from '@/editor/rendering/ShortcutsDialog';
 import {
   createImageElement,
   createShapeElement,
@@ -66,6 +68,7 @@ export function EditorTopBar() {
   } = useDeckActions();
 
   const fileRef = useRef<HTMLInputElement>(null);
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [msg, setMsg] = useState<{ kind: 'ok' | 'err'; text: string } | null>(
     null,
   );
@@ -208,7 +211,7 @@ export function EditorTopBar() {
         </ToolButton>
       </Group>
 
-      <div className="ml-auto flex items-center">
+      <div className="ml-auto flex items-center gap-2">
         {msg && (
           <span
             className={
@@ -221,7 +224,14 @@ export function EditorTopBar() {
             {msg.text}
           </span>
         )}
+        <ToolButton
+          onClick={() => setShortcutsOpen(true)}
+          title="Keyboard shortcuts (?)"
+        >
+          <Keyboard className="h-4 w-4" />
+        </ToolButton>
       </div>
+      <ShortcutsDialog open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
     </div>
   );
 }
@@ -265,11 +275,13 @@ function ToolButton({
       onClick={onClick}
       disabled={disabled}
       title={title}
+      aria-label={title}
       className={
         'h-8 w-8 inline-flex items-center justify-center rounded-md ' +
         'text-muted-foreground hover:text-foreground ' +
         'hover:bg-muted active:bg-muted/80 ' +
-        'disabled:opacity-40 disabled:hover:bg-transparent disabled:cursor-not-allowed ' +
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background ' +
+        'disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-muted-foreground disabled:cursor-not-allowed ' +
         'transition-colors ' +
         (danger ? 'hover:text-destructive ' : '')
       }
