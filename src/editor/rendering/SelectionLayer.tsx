@@ -60,6 +60,21 @@ interface DragState {
 }
 
 const DRAG_THRESHOLD_PX = 2;
+const MIN_SIZE = 20;
+
+type Corner = 'tl' | 'tr' | 'bl' | 'br';
+
+interface ResizeState {
+  pointerId: number;
+  elementId: ID;
+  corner: Corner;
+  startClientX: number;
+  startClientY: number;
+  origin: { x: number; y: number; w: number; h: number };
+  rafId: number | null;
+  lastClientX: number;
+  lastClientY: number;
+}
 
 export function SelectionLayer({ slide }: SelectionLayerProps) {
   const selectedIds = useSelectedElementIds();
