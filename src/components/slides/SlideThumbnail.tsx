@@ -1,5 +1,6 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
+import { SlideStage } from '@/slides/runtime/SlideStage';
 
 interface SlideThumbnailProps {
   slideNumber: number;
@@ -22,7 +23,7 @@ export function SlideThumbnail({
             {slideNumber}
           </span>
         </div>
-        
+
         <div
           className={cn(
             'slide-thumbnail relative flex-1 aspect-video bg-[hsl(var(--slide-bg))] rounded-md overflow-hidden border cursor-pointer',
@@ -32,17 +33,17 @@ export function SlideThumbnail({
         >
           {/* Solid background to prevent bleed-through */}
           <div className="absolute inset-0 bg-white dark:bg-slate-900" />
-          <div className="absolute inset-0 overflow-hidden pointer-events-none isolate">
-            <div 
-              className="origin-top-left"
-              style={{ 
-                transform: 'scale(0.125)', 
-                width: '800%', 
-                height: '800%' 
-              }}
-            >
+
+          {/*
+            Thumbnail rendering: SlideStage in `thumb` mode measures this
+            wrapper and scales the 1920×1080 slide to fit. The inner
+            absolute layer keeps the stage stretched across the aspect-video
+            box and blocks pointer events so clicks land on the wrapper.
+          */}
+          <div className="absolute inset-0 overflow-hidden pointer-events-none isolate flex">
+            <SlideStage mode="thumb" interactive={false}>
               {children}
-            </div>
+            </SlideStage>
           </div>
         </div>
       </div>
