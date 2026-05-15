@@ -41,6 +41,8 @@ interface DeckState {
   clearSelection: () => void;
   setZoom: (zoom: number) => void;
   setEditorMode: (mode: EditorMode) => void;
+  /** Enter/exit inline text-edit mode. Pass `null` to exit. */
+  setEditingText: (elementId: ID | null) => void;
   /**
    * Patch a single element on a slide. Pass any subset of element fields
    * (e.g. `{ x, y }` during a drag). No-ops if the slide or element is
