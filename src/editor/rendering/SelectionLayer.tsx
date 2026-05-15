@@ -130,6 +130,16 @@ export function SelectionLayer({ slide }: SelectionLayerProps) {
       // an inline text editor is active.
       if (useDeckStore.getState().editingTextId != null) return;
 
+      // Delete / Backspace → remove selected elements (skips locked ones,
+      // handled inside the store action). Only when not editing text.
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        const ids = useDeckStore.getState().selectedElementIds;
+        if (ids.length === 0) return;
+        e.preventDefault();
+        useDeckStore.getState().deleteSelectedElements();
+        return;
+      }
+
       let dx = 0;
       let dy = 0;
       switch (e.key) {
