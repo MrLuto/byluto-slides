@@ -249,6 +249,124 @@ export function SelectionLayer({ slide }: SelectionLayerProps) {
     window.addEventListener('pointercancel', endDrag);
   };
 
+  // ── Resize ────────────────────────────────────────────────────────────
+  // Per-corner math, given origin (x0,y0,w0,h0) and slide-coord deltas
+  // (dx, dy):
+  //   br: right = x0+w0+dx, bottom = y0+h0+dy → newW=right-x0, newH=bottom-y0
+  //   bl: left  = x0+dx,    bottom = y0+h0+dy → newW=(x0+w0)-left, newH=bottom-y0,
+  //                                              newX = (x0+w0) - newW
+  //   tr: right = x0+w0+dx, top    = y0+dy    → newW=right-x0,  newH=(y0+h0)-top,
+  //                                              newY = (y0+h0) - newH
+  //   tl: left  = x0+dx,    top    = y0+dy    → newW=(x0+w0)-left, newH=(y0+h0)-top,
+  //                                              newX = (x0+w0)-newW, newY = (y0+h0)-newH
+  // After clamping width/height to >= MIN_SIZE we recompute x/y from the
+  // fixed (non-moving) edge so the element doesn't drift past its anchor.
+
+  const flushResize = () => {
+    const r = resizeRef.current;
+    if (!r) return;
+    r.rafId = null;
+
+    const s = scaleRef.current || 1;
+    const dx = (r.lastClientX - r.startClientX) / s;
+    const dy = (r.lastClientY - r.startClientY) / s;
+    const { x: x0, y: y0, w: w0, h: h0 } = r.origin;
+    const right0 = x0 + w0;
+    const bottom0 = y0 + h0;
+
+    let newX = x0;
+    let newY = y0;
+    let newW = w0;
+    let newH = h0;
+
+    switch (r.corner) {
+      case 'br': {
+        newW = Math.max(MIN_SIZE, w0 + dx);
+        newH = Math.max(MIN_SIZE, h0 + dy);
+        break;
+      }
+      case 'bl': {
+        newW = Math.max(MIN_SIZE, w0 - dx);
+        newH = Math.max(MIN_SIZE, h0 + dy);
+        newX = right0 - newW;
+        break;
+      }
+      case 'tr': {
+        newW = Math.max(MIN_SIZE, w0 + dx);
+        newH = Math.max(MIN_SIZE, h0 - dy);
+        newY = bottom0 - newH;
+        break;
+      }
+      case 'tl': {
+        newW = Math.max(MIN_SIZE, w0 - dx);
+        newH = Math.max(MIN_SIZE, h0 - dy);
+        newX = right0 - newW;
+        newY = bottom0 - newH;
+        break;
+      }
+    }
+
+    updateElement(slideIdRef.current, r.elementId, {
+      x: Math.round(newX),
+      y: Math.round(newY),
+      width: Math.round(newW),
+      height: Math.round(newH),
+    });
+  };
+
+  const onResizePointerMove = (e: PointerEvent) => {
+    const r = resizeRef.current;
+    if (!r || e.pointerId !== r.pointerId) return;
+    r.lastClientX = e.clientX;
+    r.lastClientY = e.clientY;
+    if (r.rafId == null) r.rafId = requestAnimationFrame(flushResize);
+  };
+
+  const endResize = (e: PointerEvent) => {
+    const r = resizeRef.current;
+    if (!r || e.pointerId !== r.pointerId) return;
+    if (r.rafId != null) {
+      cancelAnimationFrame(r.rafId);
+      flushResize();
+    }
+    window.removeEventListener('pointermove', onResizePointerMove);
+    window.removeEventListener('pointerup', endResize);
+    window.removeEventListener('pointercancel', endResize);
+    resizeRef.current = null;
+  };
+
+  const beginResize = (
+    pointerId: number,
+    clientX: number,
+    clientY: number,
+    elementId: ID,
+    corner: Corner,
+  ) => {
+    const deck = useDeckStore.getState().currentDeck;
+    if (!deck) return;
+    const sl = deck.slides.find((x) => x.id === slideIdRef.current);
+    if (!sl) return;
+    const el = sl.elements.find((e) => e.id === elementId);
+    if (!el) return;
+    if (el.locked || el.hidden) return;
+    if (el.type === 'line') return;
+
+    resizeRef.current = {
+      pointerId,
+      elementId,
+      corner,
+      startClientX: clientX,
+      startClientY: clientY,
+      lastClientX: clientX,
+      lastClientY: clientY,
+      origin: { x: el.x, y: el.y, w: el.width, h: el.height },
+      rafId: null,
+    };
+    window.addEventListener('pointermove', onResizePointerMove);
+    window.addEventListener('pointerup', endResize);
+    window.addEventListener('pointercancel', endResize);
+  };
+
   const onBackgroundPointerDown = (e: React.PointerEvent) => {
     if (e.target !== e.currentTarget) return;
     clearSelection();
