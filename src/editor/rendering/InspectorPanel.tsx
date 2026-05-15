@@ -35,19 +35,24 @@ export function InspectorPanel() {
   const { updateElement } = useDeckActions();
 
   if (!slide)
-    return <ShellEmpty title="No slide" hint="Select a slide to begin." />;
+    return (
+      <ShellEmpty
+        title="No slide selected"
+        hint="Pick a slide from the sidebar to start editing."
+      />
+    );
   if (selectedIds.length === 0)
     return (
       <ShellEmpty
         title="Nothing selected"
-        hint="Click an element on the canvas to inspect its properties."
+        hint="Click an element on the canvas to view and edit its properties. Press ? for shortcuts."
       />
     );
   if (selectedIds.length > 1)
     return (
       <ShellEmpty
-        title={`${selectedIds.length} selected`}
-        hint="Multi-element editing is not available yet."
+        title={`${selectedIds.length} elements selected`}
+        hint="Multi-element editing isn't available yet. Select a single element to edit it."
       />
     );
 
