@@ -51,7 +51,7 @@ export function InsertToolbar() {
   const insertCircle = () =>
     addElement(
       slideId,
-      createShapeElement({ shape: 'circle', width: 320, height: 320 }),
+      createShapeElement({ shape: 'ellipse', width: 320, height: 320 }),
     );
   const insertImage = () =>
     addElement(
