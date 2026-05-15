@@ -79,8 +79,14 @@ interface ResizeState {
 
 export function SelectionLayer({ slide }: SelectionLayerProps) {
   const selectedIds = useSelectedElementIds();
-  const { selectElement, clearSelection, updateElement, setEditingText } =
-    useDeckActions();
+  const {
+    selectElement,
+    clearSelection,
+    updateElement,
+    setEditingText,
+    beginHistory,
+    endHistory,
+  } = useDeckActions();
   const editingTextId = useEditingTextId();
   const scale = useSlideScale();
 
