@@ -53,6 +53,16 @@ interface DeckState {
     elementId: ID,
     patch: Partial<SlideElement>,
   ) => void;
+  /**
+   * Append a new element to a slide and select it. Z-index is auto-assigned
+   * one above the current max so the new element renders on top.
+   */
+  addElement: (slideId: ID, element: SlideElement) => void;
+  /**
+   * Remove all currently-selected elements from the current slide. Locked
+   * elements are skipped. Clears selection + text-edit mode.
+   */
+  deleteSelectedElements: () => void;
 }
 
 export const useDeckStore = create<DeckState>((set) => ({
