@@ -454,5 +454,9 @@ export const useDeckActions = () =>
       duplicateCurrentSlide: s.duplicateCurrentSlide,
       deleteCurrentSlide: s.deleteCurrentSlide,
       moveSlide: s.moveSlide,
+      beginHistory: s.beginHistory,
+      endHistory: s.endHistory,
+      undo: s.undo,
+      redo: s.redo,
     })),
   );
