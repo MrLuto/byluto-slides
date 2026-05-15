@@ -71,7 +71,7 @@ export function IOToolbar() {
       return;
     }
     // setDeck resets history, selects first slide, and clears selection.
-    setDeck(result.data);
+    setDeck(result.data as unknown as Parameters<typeof setDeck>[0]);
     flash({ kind: 'ok', text: 'Imported deck.' });
   };
 
