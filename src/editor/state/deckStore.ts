@@ -63,6 +63,23 @@ interface DeckState {
    * elements are skipped. Clears selection + text-edit mode.
    */
   deleteSelectedElements: () => void;
+  /** Append a new blank slide and select it. */
+  addSlide: () => void;
+  /**
+   * Duplicate the current slide. The new slide gets a fresh ID and every
+   * element inside it is rewritten with a fresh ID too — we walk the
+   * element list and replace `el.id` via `crypto.randomUUID()` so nothing
+   * collides with the original. The duplicate is inserted right after the
+   * source and selected.
+   */
+  duplicateCurrentSlide: () => void;
+  /**
+   * Remove the current slide. No-ops if only one slide remains. After
+   * removal, selects the slide at the same index (or the new last slide).
+   */
+  deleteCurrentSlide: () => void;
+  /** Reorder a slide. Indices are clamped; positions are renumbered. */
+  moveSlide: (fromIndex: number, toIndex: number) => void;
 }
 
 export const useDeckStore = create<DeckState>((set) => ({
