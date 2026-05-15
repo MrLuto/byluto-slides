@@ -64,7 +64,7 @@ export function MockDeckPreview({ deckId }: { deckId?: string } = {}) {
 
   return (
     <div className="flex flex-col h-full w-full bg-muted/30 text-foreground">
-      <EditorTopBar />
+      <EditorTopBar title={title} onTitleChange={setTitle} mode={mode} />
 
       <div className="flex-1 min-h-0 flex">
         <SlideSidebar />
