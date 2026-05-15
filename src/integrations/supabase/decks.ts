@@ -64,7 +64,7 @@ export async function createDeck(deck: Deck): Promise<DeckRow> {
       id: deck.id,
       owner_id: uid,
       title: deck.title,
-      data: deck as unknown as Record<string, unknown>,
+      data: deck as never,
     })
     .select('id, title, owner_id, created_at, updated_at, thumbnail_url')
     .single();
