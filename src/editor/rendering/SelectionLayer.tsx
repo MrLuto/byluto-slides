@@ -473,8 +473,6 @@ export function SelectionLayer({ slide }: SelectionLayerProps) {
         const el = slide.elements.find((e) => e.id === selectedIds[0]);
         if (!el) return null;
         if (el.hidden || el.locked) return null;
-        if (el.type === 'line') return null;
-        if (!el) return null;
         if (el.hidden || el.locked) return null;
         if (el.type === 'line') return null;
         return (
