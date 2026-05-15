@@ -88,6 +88,7 @@ export function SelectionLayer({ slide }: SelectionLayerProps) {
   slideIdRef.current = slide.id;
 
   const dragRef = useRef<DragState | null>(null);
+  const resizeRef = useRef<ResizeState | null>(null);
 
   // Cancel any in-flight rAF on unmount or slide change.
   useEffect(() => {
@@ -95,7 +96,11 @@ export function SelectionLayer({ slide }: SelectionLayerProps) {
       if (dragRef.current?.rafId != null) {
         cancelAnimationFrame(dragRef.current.rafId);
       }
+      if (resizeRef.current?.rafId != null) {
+        cancelAnimationFrame(resizeRef.current.rafId);
+      }
       dragRef.current = null;
+      resizeRef.current = null;
     };
   }, [slide.id]);
 
