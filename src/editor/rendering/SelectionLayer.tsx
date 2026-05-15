@@ -496,9 +496,10 @@ interface ElementHitProps {
   selected: boolean;
   locked: boolean;
   onPointerDown: (e: React.PointerEvent<HTMLDivElement>) => void;
+  onDoubleClick?: () => void;
 }
 
-function ElementHit({ element, selected, locked, onPointerDown }: ElementHitProps) {
+function ElementHit({ element, selected, locked, onPointerDown, onDoubleClick }: ElementHitProps) {
   return (
     <div
       data-element-id={element.id}
