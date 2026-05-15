@@ -7,7 +7,7 @@ import { MockDeckPreview } from "@/editor/rendering/MockDeckPreview";
  */
 export default function DevMockDeck() {
   return (
-    <div className="min-h-screen w-full bg-background text-foreground flex flex-col">
+    <div className="h-screen w-full bg-background text-foreground flex flex-col overflow-hidden">
       <header className="flex items-center justify-between border-b border-border px-6 py-3">
         <div className="flex items-center gap-3">
           <span className="rounded bg-yellow-400/20 text-yellow-700 dark:text-yellow-300 px-2 py-0.5 text-xs font-mono uppercase tracking-wider">
