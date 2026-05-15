@@ -588,3 +588,91 @@ function ResizeHandles({ element, scale, onCornerPointerDown }: ResizeHandlesPro
     </>
   );
 }
+
+// ──────────────────────────────────────────────────────────────────────────
+// Inline text editing
+//
+// A textarea positioned in slide coordinates over the text element. Styles
+// mirror the rendered text (font family/size/weight/color/align/line-height)
+// so the caret aligns with what the renderer draws underneath. Updates are
+// committed to TextElement.text on every change. Exit on Escape, blur, or
+// pointerdown elsewhere (handled by SelectionLayer's background handler).
+// Note: keyboard nudging is suppressed both by the standard editable-target
+// guard (TEXTAREA) and an explicit `editingTextId != null` short-circuit.
+// ──────────────────────────────────────────────────────────────────────────
+
+interface TextEditOverlayProps {
+  element: import('@/editor/model/types').TextElement;
+  onChange: (text: string) => void;
+  onExit: () => void;
+}
+
+function TextEditOverlay({ element, onChange, onExit }: TextEditOverlayProps) {
+  const ref = React.useRef<HTMLTextAreaElement>(null);
+  React.useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.focus();
+    // Place caret at the end on entry.
+    const len = el.value.length;
+    el.setSelectionRange(len, len);
+  }, []);
+
+  const ts = element.textStyle ?? {};
+
+  return (
+    <textarea
+      ref={ref}
+      value={element.text}
+      onChange={(e) => onChange(e.target.value)}
+      onKeyDown={(e) => {
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          e.stopPropagation();
+          onExit();
+        }
+        // Stop arrows / Backspace / Delete from bubbling up to the
+        // SelectionLayer's window-level handler.
+        e.stopPropagation();
+      }}
+      onPointerDown={(e) => e.stopPropagation()}
+      onBlur={onExit}
+      spellCheck={false}
+      style={{
+        position: 'absolute',
+        left: element.x,
+        top: element.y,
+        width: element.width,
+        height: element.height,
+        transform: element.rotation
+          ? `rotate(${element.rotation}deg)`
+          : undefined,
+        transformOrigin: 'center center',
+        pointerEvents: 'auto',
+        // Match the rendered text styling so the caret aligns with the
+        // underlying preview while typing.
+        fontFamily: ts.fontFamily,
+        fontSize: ts.fontSize,
+        fontWeight: ts.fontWeight,
+        fontStyle: ts.italic ? 'italic' : undefined,
+        color: ts.color,
+        lineHeight: ts.lineHeight,
+        letterSpacing: ts.letterSpacing,
+        textAlign: ts.align,
+        whiteSpace: 'pre-wrap',
+        wordBreak: 'break-word',
+        // Editor chrome: keep selection indication, kill native textarea
+        // chrome so it overlays the rendered text cleanly.
+        background: 'transparent',
+        border: 'none',
+        outline: '2px dashed hsl(217 91% 60%)',
+        outlineOffset: '2px',
+        padding: 0,
+        margin: 0,
+        resize: 'none',
+        overflow: 'hidden',
+        boxSizing: 'border-box',
+      }}
+    />
+  );
+}
